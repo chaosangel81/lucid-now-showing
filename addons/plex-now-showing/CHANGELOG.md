@@ -3,6 +3,19 @@
 All notable changes to the Now Showing add-on will be documented here.
 The project follows [Semantic Versioning](https://semver.org/).
 
+## 2.1.1 - 2026-05-08
+
+### Added
+- Configurable Coming Soon look-ahead window via the new
+  `coming_soon_lookahead_days` option (env `COMING_SOON_LOOKAHEAD_DAYS`,
+  frontend key `comingSoonLookaheadDays`). Range is 1–365 days; default
+  remains **90** so existing installs keep their current behaviour
+  (closes #85, PR #86).
+- Radarr eligibility now includes `physicalRelease` alongside
+  `digitalRelease`. When both are present, the earliest qualifying date
+  inside the look-ahead window is selected. `inCinemas` is intentionally
+  still **not** used as a release-date fallback.
+
 ## 2.1.0 - 2026-05-03
 
 ### Added
