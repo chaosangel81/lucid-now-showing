@@ -3,7 +3,7 @@
 All notable changes to the Now Showing add-on will be documented here.
 The project follows [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 2.1.2 - 2026-05-08
 
 ### Changed
 - Radarr Coming Soon eligibility now also accepts `inCinemas` as a
@@ -11,7 +11,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   When multiple dates are populated, the earliest qualifying date inside
   the configured look-ahead window is selected. `hasFile === false` and
   monitored filtering are unchanged, so already-imported movies still
-  drop out (closes #87).
+  drop out (closes #87, PR #88).
 
 ## 2.1.1 - 2026-05-08
 
