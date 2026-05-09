@@ -4056,36 +4056,56 @@
       const lookaheadDays = Number(COMING_SOON.lookaheadDays);
       const lookahead = Number.isFinite(lookaheadDays) && lookaheadDays >= 1 ? lookaheadDays : 90;
       const end = new Date(Date.now() + lookahead * 86400000);
-      // #87: accept digitalRelease, physicalRelease, or inCinemas; pick the
-      // earliest qualifying date inside the window.
+      // Eligibility (#87): inCinemas keeps a monitored, not-downloaded movie
+      // in the rotation when no home-release date is known.
+      // Display preference (#90): prefer the earliest qualifying home-release
+      // date (digitalRelease / physicalRelease); only fall back to inCinemas
+      // when neither qualifies, and tag it so the UI labels it as a cinema
+      // date rather than imply home availability.
       const pickReleaseDate = (m) => {
         const startMs = start.getTime();
         const endMs = end.getTime();
-        const candidates = [m.digitalRelease, m.physicalRelease, m.inCinemas]
-          .filter(Boolean)
-          .map(d => ({ raw: d, ts: new Date(d).getTime() }))
-          .filter(({ ts }) => Number.isFinite(ts) && ts >= startMs && ts <= endMs)
-          .sort((a, b) => a.ts - b.ts);
-        return candidates.length ? candidates[0].raw : null;
+        const inWindow = (raw) => {
+          if (!raw) return null;
+          const ts = new Date(raw).getTime();
+          return Number.isFinite(ts) && ts >= startMs && ts <= endMs ? ts : null;
+        };
+        const home = [
+          { raw: m.digitalRelease, ts: inWindow(m.digitalRelease) },
+          { raw: m.physicalRelease, ts: inWindow(m.physicalRelease) },
+        ].filter(c => c.ts !== null);
+        if (home.length) {
+          home.sort((a, b) => a.ts - b.ts);
+          return { releaseDate: home[0].raw, releaseType: 'home' };
+        }
+        const cinemaTs = inWindow(m.inCinemas);
+        if (cinemaTs !== null) return { releaseDate: m.inCinemas, releaseType: 'cinema' };
+        return null;
       };
       return (Array.isArray(items) ? items : [])
-        .map(m => ({ m, releaseDate: pickReleaseDate(m) }))
-        .filter(({ m, releaseDate }) => !m.hasFile && releaseDate)
-        .sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate))
-        .map(({ m, releaseDate }) => ({
-          type: 'movie',
-          typeLabel: 'Movie',
-          title: m.title || 'Untitled Movie',
-          subtitle: [m.year, Array.isArray(m.genres) ? m.genres.join(' / ') : ''].filter(Boolean).join(' / '),
-          releaseDate,
-          countdown: formatComingSoonCountdown(releaseDate),
-          releaseLabel: formatComingSoonDate(releaseDate),
-          overview: m.overview || '',
-          posterUrl: coverImage(m.images, 'poster'),
-          fanartUrl: coverImage(m.images, 'fanart'),
-          localPosterUrl: m.id ? `${base}/api/v3/MediaCover/${m.id}/poster.jpg?apikey=${encodeURIComponent(COMING_SOON.radarrApiKey)}` : '',
-          localFanartUrl: m.id ? `${base}/api/v3/MediaCover/${m.id}/fanart.jpg?apikey=${encodeURIComponent(COMING_SOON.radarrApiKey)}` : '',
-        }));
+        .map(m => ({ m, picked: pickReleaseDate(m) }))
+        .filter(({ m, picked }) => !m.hasFile && picked)
+        .sort((a, b) => new Date(a.picked.releaseDate) - new Date(b.picked.releaseDate))
+        .map(({ m, picked }) => {
+          const { releaseDate, releaseType } = picked;
+          const baseLabel = formatComingSoonDate(releaseDate);
+          const releaseLabel = releaseType === 'cinema' && baseLabel ? `In cinemas: ${baseLabel}` : baseLabel;
+          return {
+            type: 'movie',
+            typeLabel: 'Movie',
+            title: m.title || 'Untitled Movie',
+            subtitle: [m.year, Array.isArray(m.genres) ? m.genres.join(' / ') : ''].filter(Boolean).join(' / '),
+            releaseDate,
+            releaseType,
+            countdown: formatComingSoonCountdown(releaseDate),
+            releaseLabel,
+            overview: m.overview || '',
+            posterUrl: coverImage(m.images, 'poster'),
+            fanartUrl: coverImage(m.images, 'fanart'),
+            localPosterUrl: m.id ? `${base}/api/v3/MediaCover/${m.id}/poster.jpg?apikey=${encodeURIComponent(COMING_SOON.radarrApiKey)}` : '',
+            localFanartUrl: m.id ? `${base}/api/v3/MediaCover/${m.id}/fanart.jpg?apikey=${encodeURIComponent(COMING_SOON.radarrApiKey)}` : '',
+          };
+        });
     }
 
     function mapSonarrComingSoon(items) {
@@ -4152,6 +4172,7 @@
         comingSoon: true,
         typeLabel: item.typeLabel || (item.type === 'tv' ? 'TV' : 'Movie'),
         releaseLabel: item.releaseLabel || '',
+        releaseType: item.releaseType || '',
         countdown: item.countdown || '',
       };
     }

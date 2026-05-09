@@ -40,20 +40,24 @@ async function fetchRadarrItems({ config, fetchImpl, start, end, now }) {
   }
   const data = await resp.json();
   return (Array.isArray(data) ? data : [])
-    .map(item => ({ item, releaseDate: pickRadarrReleaseDate(item, start, end) }))
-    .filter(({ item, releaseDate }) => !item.hasFile && releaseDate)
-    .sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate))
-    .map(({ item, releaseDate }) => {
+    .map(item => ({ item, picked: pickRadarrReleaseDate(item, start, end) }))
+    .filter(({ item, picked }) => !item.hasFile && picked)
+    .sort((a, b) => new Date(a.picked.releaseDate) - new Date(b.picked.releaseDate))
+    .map(({ item, picked }) => {
       const id = item.id || item.movieId || '';
       const genres = Array.isArray(item.genres) ? item.genres.filter(Boolean).join(' / ') : '';
+      const { releaseDate, releaseType } = picked;
+      const baseLabel = formatReleaseDate(releaseDate);
+      const releaseLabel = releaseType === 'cinema' && baseLabel ? `In cinemas: ${baseLabel}` : baseLabel;
       return {
         type: 'movie',
         typeLabel: 'Movie',
         title: item.title || 'Untitled Movie',
         subtitle: [item.year, genres].filter(Boolean).join(' / '),
         releaseDate,
+        releaseType,
         countdown: formatCountdown(releaseDate, now),
-        releaseLabel: formatReleaseDate(releaseDate),
+        releaseLabel,
         overview: item.overview || '',
         posterUrl: imageUrl(item.images, 'poster'),
         fanartUrl: imageUrl(item.images, 'fanart'),
@@ -63,16 +67,45 @@ async function fetchRadarrItems({ config, fetchImpl, start, end, now }) {
     });
 }
 
-// Return the earliest of digitalRelease/physicalRelease/inCinemas that falls
-// inside the [start, end] look-ahead window, or null if none qualify (#87).
+// Pick the visible release date for a Radarr movie.
+//
+// Eligibility (#87): inCinemas keeps a monitored, not-yet-downloaded movie in
+// the rotation when no home-release date is known.
+//
+// Display preference (#90): home-release dates (digitalRelease /
+// physicalRelease) are clearer for a Coming Soon footer because the rotation
+// is primarily a home-library availability display. We pick the earliest
+// qualifying home date; only when neither qualifies do we fall back to
+// inCinemas, and we tag releaseType: 'cinema' so the UI can label it as a
+// theatrical date rather than imply digital/physical availability.
+//
+// TMDB feasibility note: when Radarr lacks digital/physical metadata, TMDB's
+// /movie/{id}/release_dates endpoint exposes typed release dates (theatrical,
+// digital, physical, etc.) per region and could be used as a fallback. That
+// would require a TMDB API token, configurable region, and result caching, so
+// it's intentionally out of scope here. IMDb has no equivalent simple public
+// API and is not a practical alternative.
 function pickRadarrReleaseDate(item, start, end) {
-  const candidates = [item.digitalRelease, item.physicalRelease, item.inCinemas]
-    .filter(Boolean)
-    .map(d => ({ raw: d, ts: new Date(d).getTime() }))
-    .filter(({ ts }) => Number.isFinite(ts) && ts >= start.getTime() && ts <= end.getTime());
-  if (!candidates.length) return null;
-  candidates.sort((a, b) => a.ts - b.ts);
-  return candidates[0].raw;
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  const inWindow = (raw) => {
+    if (!raw) return null;
+    const ts = new Date(raw).getTime();
+    return Number.isFinite(ts) && ts >= startMs && ts <= endMs ? ts : null;
+  };
+  const homeCandidates = [
+    { raw: item.digitalRelease, ts: inWindow(item.digitalRelease) },
+    { raw: item.physicalRelease, ts: inWindow(item.physicalRelease) },
+  ].filter(c => c.ts !== null);
+  if (homeCandidates.length) {
+    homeCandidates.sort((a, b) => a.ts - b.ts);
+    return { releaseDate: homeCandidates[0].raw, releaseType: 'home' };
+  }
+  const cinemaTs = inWindow(item.inCinemas);
+  if (cinemaTs !== null) {
+    return { releaseDate: item.inCinemas, releaseType: 'cinema' };
+  }
+  return null;
 }
 
 async function fetchSonarrItems({ config, fetchImpl, start, end, now }) {
@@ -113,6 +146,7 @@ async function fetchSonarrItems({ config, fetchImpl, start, end, now }) {
         title: series.title || item.title || 'Untitled Series',
         subtitle: episodeLabel,
         releaseDate,
+        releaseType: 'air',
         countdown: formatCountdown(releaseDate, now),
         releaseLabel: formatReleaseDate(releaseDate),
         overview: item.overview || '',

@@ -230,6 +230,7 @@ test('Radarr falls back to inCinemas when only inCinemas is set and within windo
   assert.equal(items.length, 1);
   assert.equal(items[0].title, 'Theatrical Only');
   assert.equal(items[0].releaseDate, '2026-05-20T00:00:00Z');
+  assert.equal(items[0].releaseType, 'cinema');
 });
 
 test('Radarr ignores inCinemas when it falls outside the look-ahead window (#87)', async () => {
@@ -264,7 +265,7 @@ test('Radarr ignores inCinemas when it falls outside the look-ahead window (#87)
   assert.deepEqual(items, []);
 });
 
-test('Radarr picks the earliest of digital/physical/inCinemas inside the window (#87)', async () => {
+test('Radarr prefers earliest qualifying home date even when inCinemas is earlier (#90)', async () => {
   const fetchImpl = async (url) => {
     if (url.includes('radarr')) {
       return response([
@@ -296,7 +297,115 @@ test('Radarr picks the earliest of digital/physical/inCinemas inside the window 
   });
 
   assert.equal(item.title, 'All Three Dates');
-  assert.equal(item.releaseDate, '2026-05-15T00:00:00Z');
+  // Cinema date is earliest, but display prefers the earliest home date.
+  assert.equal(item.releaseDate, '2026-06-15T00:00:00Z');
+  assert.equal(item.releaseType, 'home');
+  assert.equal(item.releaseLabel, '15th of June 2026');
+});
+
+test('Radarr labels cinema-only fallback so the footer is not misleading (#90)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 50,
+          title: 'Theatrical Only',
+          inCinemas: '2026-05-20T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+
+  const [item] = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+
+  assert.equal(item.releaseType, 'cinema');
+  assert.equal(item.releaseDate, '2026-05-20T00:00:00Z');
+  assert.equal(item.releaseLabel, 'In cinemas: 20th of May 2026');
+});
+
+test('Radarr falls back to in-window cinema when home dates are out of window (#90)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 51,
+          title: 'Cinema Now Home Later',
+          inCinemas: '2026-05-25T00:00:00Z',
+          digitalRelease: '2027-06-01T00:00:00Z',
+          physicalRelease: '2027-08-01T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+
+  const [item] = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+
+  assert.equal(item.releaseType, 'cinema');
+  assert.equal(item.releaseDate, '2026-05-25T00:00:00Z');
+  assert.equal(item.releaseLabel, 'In cinemas: 25th of May 2026');
+});
+
+test('Radarr uses home date even when cinema is in-window and home is also in-window but later (#90)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 52,
+          title: 'Home Later Same Window',
+          inCinemas: '2026-05-15T00:00:00Z',
+          digitalRelease: '2026-07-20T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+
+  const [item] = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+
+  assert.equal(item.releaseType, 'home');
+  assert.equal(item.releaseDate, '2026-07-20T00:00:00Z');
+  assert.equal(item.releaseLabel, '20th of July 2026');
 });
 
 test('Radarr inCinemas movie with hasFile=true is still excluded (#87)', async () => {
