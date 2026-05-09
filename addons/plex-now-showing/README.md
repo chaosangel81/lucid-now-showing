@@ -4,6 +4,25 @@ Cinema-style now-playing and coming-soon kiosk for Home Assistant, installed
 straight from the Home Assistant add-on store. One click, no long-lived access
 token, no Docker command line.
 
+## What's new in 2.1.2
+
+- Radarr Coming Soon eligibility now also accepts `inCinemas` as a release-date
+  fallback alongside `digitalRelease` and `physicalRelease`. When more than one
+  date is populated, the earliest qualifying date inside the configured
+  look-ahead window wins.
+- Already-downloaded movies still drop out (`hasFile === false` and monitored
+  filtering are unchanged), and the configurable
+  `coming_soon_lookahead_days` window is still respected.
+
+## What's new in 2.1.1
+
+- Configurable Coming Soon look-ahead via `coming_soon_lookahead_days`
+  (1–365 days, default **90**), so Coming Soon can reach further out without
+  changing existing installs.
+- Radarr eligibility began including `physicalRelease` alongside
+  `digitalRelease`, with the earliest qualifying date inside the window
+  selected.
+
 ## What's new in 2.1.0
 
 - The add-on is now presented as **Now Showing**.
