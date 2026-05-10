@@ -54,6 +54,12 @@ export function configRoute({ config }) {
         daysOffset: config.comingSoon?.daysOffset ?? 0,
         lookaheadDays: config.comingSoon?.lookaheadDays ?? 90,
         imageType: config.comingSoon?.imageType || 'poster',
+        // #100 — cinema/theatrical inclusion toggle. The frontend keeps this
+        // for parity with the server: HACS-only installs without /api/coming-
+        // soon also evaluate eligibility client-side, and they read the same
+        // field name from /api/config so add-on/Docker installs that flip the
+        // toggle in the overlay see consistent behaviour everywhere.
+        includeCinemaReleases: config.comingSoon?.includeCinemaReleases !== false,
         // #95 — Radarr/Sonarr URLs are non-secret (typically a LAN IP); the
         // API keys stay server-side and we only surface a boolean.
         radarrUrl: config.comingSoon?.radarrUrl || '',

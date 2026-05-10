@@ -182,6 +182,12 @@ export function sanitizeOverlayInput(body) {
           out.comingSoon[k] = n;
           break;
         }
+        case 'includeCinemaReleases': {
+          const b = asBool(raw);
+          if (b === null) { errors.push(`${k}_invalid`); break; }
+          out.comingSoon[k] = b;
+          break;
+        }
       }
     }
     for (const k of OVERLAY_COMING_SOON_SECRET_KEYS) {
@@ -419,6 +425,9 @@ export function effectiveSetupView(config) {
       daysOffset: config.comingSoon?.daysOffset ?? 0,
       lookaheadDays: config.comingSoon?.lookaheadDays ?? 90,
       imageType: config.comingSoon?.imageType || 'poster',
+      // #100 — default true preserves existing installs' cinema/theatrical
+      // fallback behaviour. Only `false` (explicitly disabled) suppresses it.
+      includeCinemaReleases: config.comingSoon?.includeCinemaReleases !== false,
       radarrUrl: config.comingSoon?.radarrUrl || '',
       radarrApiKeySet: !!config.comingSoon?.radarrApiKey,
       sonarrUrl: config.comingSoon?.sonarrUrl || '',

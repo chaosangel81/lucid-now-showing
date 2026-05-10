@@ -52,6 +52,9 @@ export_opt COMING_SOON_CYCLE_INTERVAL coming_soon_cycle_interval
 export_opt COMING_SOON_DAYS_OFFSET coming_soon_days_offset
 export_opt COMING_SOON_LOOKAHEAD_DAYS coming_soon_lookahead_days
 export_opt COMING_SOON_IMAGE_TYPE  coming_soon_image_type
+# Cinema/theatrical inclusion toggle (#100). Default true keeps the pre-#100
+# fallback behaviour; setting it false suppresses cinema-only entries.
+export_opt COMING_SOON_INCLUDE_CINEMA_RELEASES coming_soon_include_cinema_releases
 # TMDB enrichment (#91). All optional; an empty TMDB_API_KEY disables the
 # fallback path completely (no API calls, no warnings).
 export_opt TMDB_API_KEY            tmdb_api_key

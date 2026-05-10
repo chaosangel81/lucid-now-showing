@@ -3,6 +3,25 @@
 All notable changes to the Now Showing add-on will be documented here.
 The project follows [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- Toggle to include or exclude cinema/theatrical releases from Coming
+  Soon (closes #100). New `coming_soon_include_cinema_releases` add-on
+  option / `COMING_SOON_INCLUDE_CINEMA_RELEASES` Docker env var, and an
+  "Include cinema / theatrical releases" checkbox in the in-app setup
+  overlay (Coming Soon sources). Default is **on**, which preserves the
+  pre-#100 fallback behaviour exactly: Radarr `inCinemas` and TMDB
+  theatrical release types act as eligibility/display fallbacks, and
+  cinema-only entries appear with the existing `In cinemas: <date>`
+  label. Turning the toggle off suppresses cinema-only entries entirely
+  — Radarr `inCinemas` is ignored and TMDB theatrical types are
+  skipped — while digital and physical home releases keep showing.
+  Monitored, `hasFile`, and the configurable look-ahead window keep
+  applying as before. The toggle is persisted server-side in the v2.1.5
+  overlay file (`/data/overlay.json`) and applies across every browser,
+  kiosk and phone on the install.
+
 ## 2.1.5 - 2026-05-09
 
 ### Added

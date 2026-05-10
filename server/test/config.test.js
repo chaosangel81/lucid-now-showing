@@ -122,6 +122,24 @@ test('coming soon config parses source settings and validates required source', 
   assert.equal(config.comingSoon.imageType, 'fanart');
 });
 
+test('coming soon includeCinemaReleases defaults true and parses env var (#100)', () => {
+  const { config: defaults } = loadConfig({ SUPERVISOR_TOKEN: 'x' });
+  assert.equal(defaults.comingSoon.includeCinemaReleases, true,
+    'default must preserve pre-#100 cinema fallback');
+
+  const { config: off } = loadConfig({
+    SUPERVISOR_TOKEN: 'x',
+    COMING_SOON_INCLUDE_CINEMA_RELEASES: 'false',
+  });
+  assert.equal(off.comingSoon.includeCinemaReleases, false);
+
+  const { config: on } = loadConfig({
+    SUPERVISOR_TOKEN: 'x',
+    COMING_SOON_INCLUDE_CINEMA_RELEASES: 'true',
+  });
+  assert.equal(on.comingSoon.includeCinemaReleases, true);
+});
+
 test('coming soon lookaheadDays defaults to 90 and clamps out-of-range values', () => {
   const { config: defaults } = loadConfig({ SUPERVISOR_TOKEN: 'x' });
   assert.equal(defaults.comingSoon.lookaheadDays, 90);

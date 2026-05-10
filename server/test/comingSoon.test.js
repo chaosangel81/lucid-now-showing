@@ -885,3 +885,278 @@ test('TMDB digital date out of look-ahead window is ignored', async () => {
   assert.equal(item.releaseType, 'cinema');
   assert.equal(item.releaseDate, '2026-05-20T00:00:00Z');
 });
+
+// ---- Cinema/theatrical inclusion toggle (#100) ----------------------------
+
+test('default (includeCinemaReleases unset) preserves cinema fallback behaviour', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 600,
+          title: 'Theatrical Only',
+          inCinemas: '2026-05-20T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        // includeCinemaReleases is intentionally omitted — exercises the
+        // backward-compatible default that keeps the cinema fallback on.
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].title, 'Theatrical Only');
+  assert.equal(items[0].releaseType, 'cinema');
+  assert.equal(items[0].releaseLabel, 'In cinemas: 20th of May 2026');
+});
+
+test('includeCinemaReleases=true keeps Radarr inCinemas eligibility', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        { id: 601, title: 'Theatrical Only', inCinemas: '2026-05-25T00:00:00Z', hasFile: false },
+      ]);
+    }
+    return response([]);
+  };
+  const [item] = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: true,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.equal(item.releaseType, 'cinema');
+  assert.equal(item.releaseDate, '2026-05-25T00:00:00Z');
+});
+
+test('includeCinemaReleases=false excludes Radarr inCinemas-only titles (#100)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        { id: 602, title: 'Theatrical Only', inCinemas: '2026-05-20T00:00:00Z', hasFile: false },
+      ]);
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.deepEqual(items, []);
+});
+
+test('includeCinemaReleases=false still allows digital and physical releases (#100)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 603,
+          title: 'Has Digital',
+          digitalRelease: '2026-06-10T00:00:00Z',
+          inCinemas: '2026-05-15T00:00:00Z',
+          hasFile: false,
+        },
+        {
+          id: 604,
+          title: 'Has Physical',
+          physicalRelease: '2026-06-15T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  const titles = items.map(i => i.title).sort();
+  assert.deepEqual(titles, ['Has Digital', 'Has Physical']);
+  for (const item of items) {
+    assert.equal(item.releaseType, 'home');
+  }
+});
+
+test('includeCinemaReleases=false ignores TMDB theatrical-only enrichment (#100)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 605,
+          title: 'Theatrical TMDB Only',
+          tmdbId: 9100,
+          // Radarr knows nothing about this movie's dates at all.
+          hasFile: false,
+        },
+      ]);
+    }
+    if (url.includes('/movie/9100/release_dates')) {
+      return response(tmdbReleaseDates({
+        region: 'AU',
+        theatrical: '2026-06-05T00:00:00Z',
+      }));
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+        tmdb: { apiKey: 'k', region: 'AU' },
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.deepEqual(items, []);
+});
+
+test('includeCinemaReleases=false still picks up TMDB digital enrichment (#100)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 606,
+          title: 'Cinema Plus Digital',
+          tmdbId: 9101,
+          inCinemas: '2026-05-15T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    if (url.includes('/movie/9101/release_dates')) {
+      return response(tmdbReleaseDates({
+        region: 'AU',
+        digital: '2026-06-20T00:00:00Z',
+      }));
+    }
+    return response([]);
+  };
+  const [item] = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+        tmdb: { apiKey: 'k', region: 'AU' },
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  // TMDB digital wins; the Radarr inCinemas date is ignored entirely.
+  assert.equal(item.title, 'Cinema Plus Digital');
+  assert.equal(item.releaseType, 'home');
+  assert.equal(item.releaseDate, '2026-06-20T00:00:00Z');
+});
+
+test('includeCinemaReleases=false still excludes hasFile movies (#100 regression)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 607,
+          title: 'Already Downloaded',
+          digitalRelease: '2026-06-01T00:00:00Z',
+          hasFile: true,
+        },
+      ]);
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.deepEqual(items, []);
+});
+
+test('includeCinemaReleases=false still respects the look-ahead window (#100 regression)', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('radarr')) {
+      return response([
+        {
+          id: 608,
+          title: 'Far Out Digital',
+          digitalRelease: '2027-08-01T00:00:00Z',
+          hasFile: false,
+        },
+      ]);
+    }
+    return response([]);
+  };
+  const items = await fetchComingSoonItems({
+    config: {
+      comingSoon: {
+        radarrUrl: 'http://radarr.local:7878',
+        radarrApiKey: 'rk',
+        moviesCount: 5,
+        showsCount: 5,
+        lookaheadDays: 90,
+        includeCinemaReleases: false,
+      },
+    },
+    fetchImpl,
+    now: new Date('2026-05-02T12:00:00Z'),
+  });
+  assert.deepEqual(items, []);
+});

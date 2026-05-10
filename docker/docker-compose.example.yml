@@ -76,6 +76,12 @@ services:
       TMDB_REGION: "${TMDB_REGION:-AU}"
       TMDB_TTL_MS: "${TMDB_TTL_MS:-21600000}"
 
+      # ---- Coming Soon cinema/theatrical inclusion (#100) ----
+      # Default true preserves the existing fallback behaviour. Flip to
+      # false (or untick the toggle in the in-app setup overlay) to hide
+      # cinema-only entries; digital/physical home releases are unaffected.
+      COMING_SOON_INCLUDE_CINEMA_RELEASES: "${COMING_SOON_INCLUDE_CINEMA_RELEASES:-true}"
+
       # ---- Optional hardening (recommended if exposed off-LAN) ----
       PROXY_SECRET: "${PROXY_SECRET:-}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"

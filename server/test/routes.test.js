@@ -146,6 +146,7 @@ test('GET /api/config defaults every visual toggle off', async () => {
         daysOffset: 0,
         lookaheadDays: 90,
         imageType: 'poster',
+        includeCinemaReleases: true,
         radarrUrl: '',
         radarrApiKeySet: false,
         sonarrUrl: '',

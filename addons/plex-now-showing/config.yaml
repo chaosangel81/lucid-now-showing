@@ -64,6 +64,11 @@ options:
   coming_soon_days_offset: 0
   coming_soon_lookahead_days: 90
   coming_soon_image_type: poster
+  # Cinema/theatrical inclusion toggle (#100). Default true preserves the
+  # pre-#100 behaviour (Radarr inCinemas / TMDB theatrical types act as
+  # eligibility/display fallbacks). Set false to suppress cinema-only entries
+  # entirely; digital and physical home releases are unaffected.
+  coming_soon_include_cinema_releases: true
   # Optional TMDB enrichment (#91) — fills in digital/physical/theatrical
   # release dates Radarr's calendar doesn't have. Disabled by default; leave
   # tmdb_api_key blank to keep Coming Soon fully Radarr-driven.
@@ -133,6 +138,7 @@ schema:
   coming_soon_days_offset: "int(0,365)"
   coming_soon_lookahead_days: "int(1,365)"
   coming_soon_image_type: "list(poster|fanart)"
+  coming_soon_include_cinema_releases: "bool"
   tmdb_api_key: "password?"
   tmdb_region: "match(^[A-Za-z]{2}$)?"
   tmdb_ttl_ms: "int(10000,86400000)"
