@@ -35,6 +35,10 @@ export async function fetchComingSoonItems({
 async function fetchRadarrItems({ config, fetchImpl, start, end, now, tmdbCache, logger }) {
   const c = config?.comingSoon || {};
   if (!c.radarrUrl || !c.radarrApiKey) return [];
+  // #100 — cinema/theatrical inclusion toggle. Default true keeps Radarr
+  // `inCinemas` and TMDB theatrical types as eligibility/display fallbacks
+  // exactly as before. When the user turns this off we ignore both entirely.
+  const includeCinema = c.includeCinemaReleases !== false;
   const base = trimSlash(c.radarrUrl);
   const url = `${base}/api/v3/calendar?start=${dateOnly(start)}&end=${dateOnly(end)}&unmonitored=false`;
   const resp = await fetchImpl(url, { headers: { 'X-Api-Key': c.radarrApiKey } });
@@ -50,7 +54,7 @@ async function fetchRadarrItems({ config, fetchImpl, start, end, now, tmdbCache,
   // First pass: pick the best date Radarr alone can provide.
   const radarrPicks = eligible.map(item => ({
     item,
-    picked: pickRadarrReleaseDate(item, start, end),
+    picked: pickRadarrReleaseDate(item, start, end, includeCinema),
   }));
 
   // Second pass: when TMDB enrichment is enabled, fill in dates Radarr
@@ -70,6 +74,7 @@ async function fetchRadarrItems({ config, fetchImpl, start, end, now, tmdbCache,
         logger,
         start,
         end,
+        includeCinema,
       });
       if (upgraded) entry.picked = upgraded;
     }
@@ -115,7 +120,7 @@ async function fetchRadarrItems({ config, fetchImpl, start, end, now, tmdbCache,
 // Returns null when TMDB has nothing better; the caller keeps the original
 // Radarr pick (or the original null result, if any) untouched.
 async function maybeEnrichWithTmdb({
-  radarrItem, radarrPick, config, fetchImpl, cache, logger, start, end,
+  radarrItem, radarrPick, config, fetchImpl, cache, logger, start, end, includeCinema = true,
 }) {
   const radarrIsHome = radarrPick && radarrPick.releaseType === 'home';
   // If Radarr already has the strongest signal we can offer, skip the call —
@@ -156,6 +161,10 @@ async function maybeEnrichWithTmdb({
   // keep it — it's likely just as good and avoids a flicker on cache miss.
   if (radarrPick && radarrPick.releaseType === 'cinema') return null;
 
+  // #100 — when cinema/theatrical inclusion is disabled, ignore TMDB
+  // theatrical dates entirely. Caller will drop the entry as unreleased.
+  if (!includeCinema) return null;
+
   const cinema = inWindowRaw(tmdbDates.theatrical);
   if (cinema) {
     return { releaseDate: cinema, releaseType: 'cinema', source: 'tmdb' };
@@ -180,7 +189,7 @@ async function maybeEnrichWithTmdb({
 // digital/physical/theatrical dates for the configured region. Radarr stays
 // the primary source; TMDB only touches the result when Radarr's calendar
 // answer has nothing usable to display.
-function pickRadarrReleaseDate(item, start, end) {
+function pickRadarrReleaseDate(item, start, end, includeCinema = true) {
   const startMs = start.getTime();
   const endMs = end.getTime();
   const inWindow = (raw) => {
@@ -196,6 +205,10 @@ function pickRadarrReleaseDate(item, start, end) {
     homeCandidates.sort((a, b) => a.ts - b.ts);
     return { releaseDate: homeCandidates[0].raw, releaseType: 'home' };
   }
+  // #100 — when cinema inclusion is disabled, drop the item rather than
+  // falling back to inCinemas. monitored / hasFile / lookahead filtering
+  // upstream is unchanged.
+  if (!includeCinema) return null;
   const cinemaTs = inWindow(item.inCinemas);
   if (cinemaTs !== null) {
     return { releaseDate: item.inCinemas, releaseType: 'cinema' };

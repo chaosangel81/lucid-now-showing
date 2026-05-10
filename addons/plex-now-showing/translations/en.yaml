@@ -94,6 +94,15 @@ configuration:
   coming_soon_image_type:
     name: Coming Soon image type
     description: Use portrait poster art or landscape fanart/backdrop art.
+  coming_soon_include_cinema_releases:
+    name: Include cinema/theatrical releases
+    description: >-
+      When on (default), Radarr inCinemas dates and TMDB theatrical release
+      types are used as eligibility/display fallbacks for Coming Soon, so
+      movies that only have a theatrical date still appear (labelled "In
+      cinemas: <date>"). Turn off to hide those entries; digital and
+      physical home releases keep showing either way. Monitored / hasFile /
+      look-ahead filtering is unaffected.
   tmdb_api_key:
     name: TMDB API key (optional)
     description: >-

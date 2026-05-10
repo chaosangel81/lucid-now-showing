@@ -1741,6 +1741,13 @@
               <input id="cfgComingSoonLookaheadDays" type="number" min="1" max="365" step="1" inputmode="numeric" autocomplete="off">
               <div class="hint">Forward window for upcoming releases. Default 90.</div>
             </div>
+            <div class="setup-field">
+              <label class="setup-check" for="cfgComingSoonIncludeCinemaReleases">
+                <input id="cfgComingSoonIncludeCinemaReleases" type="checkbox" checked>
+                Include cinema / theatrical releases
+              </label>
+              <div class="hint">When off, the rotation hides movies whose only known release date is theatrical. Digital and physical home releases keep showing. Default on.</div>
+            </div>
           </div>
 
           <!--
@@ -2246,6 +2253,9 @@
       daysOffset: readIntClamped('comingSoonDaysOffset', 0, 0, 365),
       lookaheadDays: readIntClamped('comingSoonLookaheadDays', 90, 1, 365),
       imageType: readConfig('comingSoonImageType', { aliases: ['coming_soon_image_type'], defaultValue: 'poster' }) === 'fanart' ? 'fanart' : 'poster',
+      // #100 — cinema/theatrical inclusion. Default true preserves the
+      // pre-#100 fallback behaviour so existing installs see no change.
+      includeCinemaReleases: readBool('comingSoonIncludeCinemaReleases', true),
     };
 
     // ===== SERVER MODE DETECTION =====
@@ -2436,6 +2446,7 @@
           if (Number.isFinite(cs.daysOffset)) COMING_SOON.daysOffset = cs.daysOffset;
           if (Number.isFinite(cs.lookaheadDays)) COMING_SOON.lookaheadDays = cs.lookaheadDays;
           if (cs.imageType === 'poster' || cs.imageType === 'fanart') COMING_SOON.imageType = cs.imageType;
+          if (typeof cs.includeCinemaReleases === 'boolean') COMING_SOON.includeCinemaReleases = cs.includeCinemaReleases;
         }
         const v = body && body.visual;
         if (v && typeof v.progressBar === 'boolean') VISUAL.progressBar = v.progressBar;
@@ -2716,6 +2727,9 @@
       ['visualUseBackdrops', 'cfgVisualUseBackdrops', false],
       ['visualBurnInMitigation', 'cfgVisualBurnInMitigation', false],
       ['switcherEnabled', 'cfgSwitcherEnabled', false],
+      // #100 — cinema/theatrical inclusion. Default true preserves existing
+      // behaviour; users opt out from the setup overlay.
+      ['comingSoonIncludeCinemaReleases', 'cfgComingSoonIncludeCinemaReleases', true],
     ];
     const SETUP_NUMBER_RULES = {
       visualBackdropDelayMs: { min: 1000, max: 600000, fallback: 10000, float: false },
@@ -3005,6 +3019,9 @@
       if (Number.isFinite(cs2.daysOffset)) fillFromServer('cfgComingSoonDaysOffset', cs2.daysOffset);
       if (Number.isFinite(cs2.lookaheadDays)) fillFromServer('cfgComingSoonLookaheadDays', cs2.lookaheadDays);
       fillFromServer('cfgComingSoonImageType', cs2.imageType);
+      if (typeof cs2.includeCinemaReleases === 'boolean') {
+        fillFromServer('cfgComingSoonIncludeCinemaReleases', cs2.includeCinemaReleases);
+      }
       fillFromServer('cfgTmdbRegion', tmdb2.region);
       // Re-run dependent toggles in case we just filled the backend/displayMode.
       try {
@@ -3649,6 +3666,8 @@
           sonarrUrl: val('cfgSonarrUrl'),
           sonarrApiKey: val('cfgSonarrApiKey'),
           imageType: val('cfgComingSoonImageType'),
+          // #100 — boolean false is a real saved value (the explicit opt-out).
+          includeCinemaReleases: bool('cfgComingSoonIncludeCinemaReleases'),
           tmdb: {
             apiKey: val('cfgTmdbApiKey'),
             region: val('cfgTmdbRegion'),
@@ -4427,6 +4446,9 @@
           home.sort((a, b) => a.ts - b.ts);
           return { releaseDate: home[0].raw, releaseType: 'home' };
         }
+        // #100 — when cinema/theatrical inclusion is disabled, drop the
+        // entry rather than falling back to inCinemas.
+        if (COMING_SOON.includeCinemaReleases === false) return null;
         const cinemaTs = inWindow(m.inCinemas);
         if (cinemaTs !== null) return { releaseDate: m.inCinemas, releaseType: 'cinema' };
         return null;

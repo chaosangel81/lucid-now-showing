@@ -45,6 +45,7 @@ probe of `/api`) and switches to `/api/state`. Plex-only metadata calls use
 | `coming_soon_days_offset` | `0` | Include releases from this many days in the past. |
 | `coming_soon_lookahead_days` | `90` | Forward window (days) for upcoming releases. Radarr eligibility accepts `digitalRelease`, `physicalRelease`, or `inCinemas`. The displayed footer date prefers the earliest qualifying home-release date; cinema-only items are labelled `In cinemas: <date>` so the footer is not mistaken for home availability. |
 | `coming_soon_image_type` | `poster` | `poster` or `fanart`. |
+| `coming_soon_include_cinema_releases` | `true` | Whether cinema/theatrical releases are included in Coming Soon. Default `true` preserves the existing fallback behaviour: Radarr `inCinemas` and TMDB theatrical types act as eligibility/display fallbacks, and cinema-only entries appear with an `In cinemas: <date>` label. Set to `false` to suppress those entries entirely; digital and physical home releases keep showing. Monitored / `hasFile` / look-ahead filtering is unaffected. Editable from the in-app setup overlay (#100). |
 | `tmdb_api_key` | _empty_ | Optional TMDB API key (v3 or v4). When set, fills in digital/physical/theatrical release dates Radarr's calendar is missing. Empty disables the fallback completely. |
 | `tmdb_region` | `AU` | ISO 3166-1 country code used to select region-specific release dates from TMDB. Falls back to whatever region TMDB lists first if there's no match. |
 | `tmdb_ttl_ms` | `21600000` | TMDB lookup cache TTL (ms). Default 6 h. |

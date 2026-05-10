@@ -68,6 +68,13 @@ export function loadConfig(env = process.env) {
       // meaningful; upper bound of 365 mirrors daysOffset.
       lookaheadDays: parseIntClamped(env.COMING_SOON_LOOKAHEAD_DAYS, 90, 1, 365),
       imageType: parseEnum(env.COMING_SOON_IMAGE_TYPE, ['poster', 'fanart'], 'poster'),
+      // Cinema/theatrical release inclusion (#100). Default true preserves the
+      // pre-#100 behaviour where Radarr `inCinemas` and TMDB theatrical
+      // release types act as eligibility/display fallbacks. When false the
+      // Coming Soon feed only considers home-release dates (digitalRelease /
+      // physicalRelease + TMDB digital/physical types), so a movie that has
+      // only a cinema/theatrical date is filtered out entirely.
+      includeCinemaReleases: parseBool(env.COMING_SOON_INCLUDE_CINEMA_RELEASES, true),
       // Optional TMDB enrichment (#91). Disabled unless an API token is
       // supplied. Fills in digital/physical/theatrical release dates by
       // region when Radarr's calendar response lacks them — Radarr stays the

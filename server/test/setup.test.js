@@ -332,6 +332,82 @@ test('applyOverlay merges nested objects without mutating base', () => {
   assert.deepEqual(base, baseClone);
 });
 
+// === #100 cinema/theatrical inclusion toggle ===
+
+test('GET /api/setup defaults includeCinemaReleases to true (no overlay) (#100)', async (t) => {
+  const { url } = await startApp(t);
+  const view = await fetch(`${url}/api/setup`).then(r => r.json());
+  assert.equal(view.comingSoon.includeCinemaReleases, true,
+    'default must preserve pre-#100 cinema fallback behaviour');
+});
+
+test('POST /api/setup persists includeCinemaReleases=false server-side (#100)', async (t) => {
+  const overlayPath = tmpStorePath(t);
+  const a = await startApp(t, { overlayPath });
+  const resp = await fetch(`${a.url}/api/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comingSoon: { includeCinemaReleases: false } }),
+  });
+  assert.equal(resp.status, 200);
+
+  // Persisted to disk and visible to a fresh process.
+  const onDisk = JSON.parse(readFileSync(overlayPath, 'utf8'));
+  assert.equal(onDisk.comingSoon.includeCinemaReleases, false,
+    'overlay file should hold the new toggle value');
+
+  const b = await startApp(t, { overlayPath });
+  const seen = await fetch(`${b.url}/api/setup`).then(r => r.json());
+  assert.equal(seen.comingSoon.includeCinemaReleases, false);
+
+  // /api/config also surfaces the value so the kiosk frontend stays in sync.
+  const cfg = await fetch(`${b.url}/api/config`).then(r => r.json());
+  assert.equal(cfg.comingSoon.includeCinemaReleases, false);
+});
+
+test('POST /api/setup can flip includeCinemaReleases back to true (#100)', async (t) => {
+  const overlayPath = tmpStorePath(t);
+  const a = await startApp(t, { overlayPath });
+  await fetch(`${a.url}/api/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comingSoon: { includeCinemaReleases: false } }),
+  });
+  await fetch(`${a.url}/api/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comingSoon: { includeCinemaReleases: true } }),
+  });
+  const view = await fetch(`${a.url}/api/setup`).then(r => r.json());
+  assert.equal(view.comingSoon.includeCinemaReleases, true);
+});
+
+test('POST /api/setup rejects non-boolean includeCinemaReleases (#100)', async (t) => {
+  const { url } = await startApp(t);
+  // asBool() accepts string truthy/falsy synonyms ("true"/"false"); only a
+  // genuinely unparseable value (object, number) is rejected as invalid.
+  const r = await fetch(`${url}/api/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comingSoon: { includeCinemaReleases: { nope: 1 } } }),
+  });
+  assert.equal(r.status, 400);
+  const body = await r.json();
+  assert.ok(body.details.includes('includeCinemaReleases_invalid'));
+});
+
+test('Add-on/Docker default fallback: env var false propagates through to /api/setup (#100)', async (t) => {
+  const cfg = envBaseConfig({
+    comingSoon: {
+      ...envBaseConfig().comingSoon,
+      includeCinemaReleases: false,
+    },
+  });
+  const { url } = await startApp(t, { config: cfg });
+  const view = await fetch(`${url}/api/setup`).then(r => r.json());
+  assert.equal(view.comingSoon.includeCinemaReleases, false);
+});
+
 test('effectiveSetupView never includes secret values', () => {
   const cfg = envBaseConfig({
     plexToken: 'plex-secret-7777',

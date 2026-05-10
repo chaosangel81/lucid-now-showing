@@ -61,6 +61,9 @@ export const OVERLAY_COMING_SOON_KEYS = [
   'daysOffset',
   'lookaheadDays',
   'imageType',
+  // #100 — boolean toggle. Default true preserves the pre-#100 cinema/
+  // theatrical fallback behaviour; false strips cinema/theatrical entirely.
+  'includeCinemaReleases',
 ];
 
 export const OVERLAY_COMING_SOON_SECRET_KEYS = [
@@ -171,6 +174,8 @@ export function applyOverlay(baseConfig, overlay) {
   for (const k of OVERLAY_COMING_SOON_KEYS) {
     if (['moviesCount', 'showsCount', 'cycleInterval', 'daysOffset', 'lookaheadDays'].includes(k)) {
       overrideNumber(out.comingSoon, cs, k);
+    } else if (k === 'includeCinemaReleases') {
+      overrideBool(out.comingSoon, cs, k);
     } else {
       overrideString(out.comingSoon, cs, k);
     }
