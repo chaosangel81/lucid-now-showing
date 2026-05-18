@@ -285,6 +285,76 @@
       box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4);
     }
 
+    /* CSS-driven bulb chase (#16) — replaces the old setInterval approach.
+     * Each bulb's delay is set by JS via style="animation-delay: …ms".
+     * The animation toggles the 'off' class in three phases (on → off → off)
+     * to keep the original 3-step chase look without JS timers. */
+    @keyframes bulb-chase {
+      0%, 30% { background: radial-gradient(circle at 40% 35%,
+          color-mix(in srgb, var(--bulb-on) 70%, #fff 30%),
+          var(--bulb-on) 40%,
+          var(--accent-mid) 100%);
+        box-shadow:
+          0 0 16px 6px color-mix(in srgb, var(--accent-glow) 70%, transparent),
+          0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
+          0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent); }
+      33%, 95% { background: radial-gradient(circle at 40% 35%, #887744, var(--bulb-off) 60%);
+        box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4); }
+      100% { background: radial-gradient(circle at 40% 35%,
+          color-mix(in srgb, var(--bulb-on) 70%, #fff 30%),
+          var(--bulb-on) 40%,
+          var(--accent-mid) 100%);
+        box-shadow:
+          0 0 16px 6px color-mix(in srgb, var(--accent-glow) 70%, transparent),
+          0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
+          0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent); }
+    }
+
+    .bulb.chase-anim {
+      animation: bulb-chase 1.5s ease-in-out infinite;
+    }
+
+    /* ===== CONNECTION STATUS INDICATOR (#15) ===== */
+    .status-dots {
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      display: flex;
+      gap: 6px;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      transition: background 0.5s ease;
+    }
+    .status-dot.green { background: #22c55e; box-shadow: 0 0 4px #22c55e88; }
+    .status-dot.amber  { background: #eab308; box-shadow: 0 0 4px #eab30888; }
+    .status-dot.red    { background: #ef4444; box-shadow: 0 0 4px #ef444488; }
+    .status-dot.grey   { background: #6b7280; box-shadow: 0 0 2px #6b728088; }
+
+    /* Debug overlay (#15) — shown when ?debug=1 is set */
+    #debugOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.8);
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 12px;
+      overflow-y: auto;
+      z-index: 200;
+      pointer-events: none;
+      white-space: pre-wrap;
+    }
+    body.debug-mode #debugOverlay {
+      display: block;
+    }
+
     /* ===== MARQUEE BANNER ===== */
     .marquee {
       position: relative;
@@ -2049,6 +2119,15 @@
 
   <!-- OUTER BULBS (around entire screen edge) -->
   <div class="bulbs-outer" id="bulbsOuter"></div>
+
+  <!-- CONNECTION STATUS INDICATORS (#15) -->
+  <div class="status-dots" id="statusDots">
+    <div class="status-dot grey" id="statusDotHa" title="Home Assistant"></div>
+    <div class="status-dot grey" id="statusDotBackend" title="Media backend"></div>
+  </div>
+
+  <!-- DEBUG OVERLAY (#15) — shown when ?debug=1 -->
+  <div id="debugOverlay"></div>
 
   <!-- FRAME WRAPPER (full-screen, vertical layout) -->
   <div class="frame-wrapper" id="frameWrapper">
@@ -4260,8 +4339,7 @@
     }
 
     // ===== OUTER BULB LIGHTS (around screen edge) =====
-    let chaseOffset = 0;
-    let chaseTimer = null;
+    // CSS-driven chase (#16): no JS timer, just per-bulb animation-delay.
 
     function createOuterBulbs() {
       if (VISUAL.frameStyle !== 'bulbs') {
@@ -4314,45 +4392,96 @@
       bulbsOuterContainer.innerHTML = '';
       bulbs.forEach((b, idx) => {
         const el = document.createElement('div');
-        el.className = 'bulb';
+        el.className = 'bulb chase-anim';
         el.style.left = b.x + 'px';
         el.style.top = b.y + 'px';
         el.dataset.index = idx;
+        // Stagger animation-delay so bulbs form a moving chase pattern
+        el.style.animationDelay = `${idx * 60}ms`;
         bulbsOuterContainer.appendChild(el);
       });
     }
 
-
-
     function syncFrameStyle() {
       if (VISUAL.frameStyle !== 'bulbs') {
-        if (chaseTimer != null) {
-          clearInterval(chaseTimer);
-          chaseTimer = null;
-        }
-        chaseOffset = 0;
         bulbsOuterContainer.innerHTML = '';
         return;
       }
-
       createOuterBulbs();
-      if (chaseTimer == null) {
-        animateChase();
-        chaseTimer = setInterval(animateChase, 500);
+    }
+
+    // ===== CONNECTION STATUS INDICATORS (#15) =====
+    let statusTimer = null;
+
+    function setStatusDot(id, state) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = 'status-dot ' + state;
+    }
+
+    async function pollConnectionStatus() {
+      // HA health check
+      try {
+        const haResp = await fetch('/healthz', { cache: 'no-store' });
+        setStatusDot('statusDotHa', haResp.ok ? 'green' : 'red');
+        if (!haResp.ok) debugLogMsg(`HA health check returned ${haResp.status}`);
+      } catch (e) {
+        debugLogMsg(`HA health check failed: ${e.message}`);
+        setStatusDot('statusDotHa', 'grey');
+      }
+
+      // Backend health check via /api/state
+      try {
+        const beResp = await fetch('/api/state', { cache: 'no-store' });
+        if (beResp.ok) {
+          const data = await beResp.json();
+          // If we have artwork/media, backend is talking
+          setStatusDot('statusDotBackend', data && data.state && data.state !== 'idle' ? 'green' : 'amber');
+        } else {
+          debugLogMsg(`Backend state returned ${beResp.status}`);
+          setStatusDot('statusDotBackend', 'red');
+        }
+      } catch (e) {
+        debugLogMsg(`Backend health check failed: ${e.message}`);
+        setStatusDot('statusDotBackend', 'grey');
+      }
+
+      // Update debug overlay if active
+      if (window.DEBUG_MODE) {
+        updateDebugOverlay();
       }
     }
 
-    // Chase light animation — outer bulbs only, and only while #65 is 'bulbs'.
-    function animateChase() {
-      if (VISUAL.frameStyle !== 'bulbs') return;
-      const outerBulbs = bulbsOuterContainer.querySelectorAll('.bulb');
-      outerBulbs.forEach((el, i) => {
-        const phase = (i + chaseOffset) % 3;
-        el.classList.toggle('off', phase !== 0);
-      });
-
-      chaseOffset = (chaseOffset + 1) % 3;
+    function startConnectionPolling() {
+      pollConnectionStatus();
+      statusTimer = setInterval(pollConnectionStatus, 15000);
     }
+
+    // ===== DEBUG MODE (#15) =====
+    let debugLog = [];
+
+    function updateDebugOverlay() {
+      const overlay = document.getElementById('debugOverlay');
+      if (!overlay) return;
+      overlay.textContent = debugLog.slice(-100).join('\n');
+    }
+
+    function debugLogMsg(msg) {
+      if (!window.DEBUG_MODE) return;
+      const t = new Date().toLocaleTimeString();
+      debugLog.push(`[${t}] ${msg}`);
+      if (debugLog.length > 200) debugLog.splice(0, debugLog.length - 100);
+      updateDebugOverlay();
+    }
+
+    // Detect ?debug=1 in URL
+    (function initDebugMode() {
+      const p = new URLSearchParams(window.location.search);
+      window.DEBUG_MODE = p.has('debug') && p.get('debug') === '1';
+      if (window.DEBUG_MODE) {
+        document.body.classList.add('debug-mode');
+      }
+    })();
 
     let comingSoonCache = { items: [], fetchedAt: 0 };
 
@@ -5081,8 +5210,10 @@
       const data = await fetchNowShowingData();
       if (data) {
         showMedia(data);
+        debugLogMsg(`State: ${data.state} | ${data.title || '?'}${data.seriesTitle ? ' — ' + data.seriesTitle : ''}`);
       } else {
         showIdle();
+        debugLogMsg('No media — idle');
       }
     }
 
@@ -5095,6 +5226,8 @@
       syncDisplayModeText();
       poll();
       setInterval(poll, POLL_INTERVAL);
+      startConnectionPolling();
+      if (window.DEBUG_MODE) debugLogMsg('Debug mode enabled, polling started');
     }
 
     // Recreate bulbs on resize

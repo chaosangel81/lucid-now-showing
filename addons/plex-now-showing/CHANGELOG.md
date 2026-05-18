@@ -3,6 +3,19 @@
 All notable changes to the Now Showing add-on will be documented here.
 The project follows [Semantic Versioning](https://semver.org/).
 
+## 2.2.0 - 2026-05-18
+
+### Added
+- CSS-driven chase animation (closes #16) — replaces JS `setInterval` with
+  `@keyframes` animation. Smoother on low-end tablets, no GC churn, survives
+  tab backgrounding.
+- Connection status indicators (closes #15) — two small dots in the bottom-right
+  corner show HA server health (green/amber/red/grey) and media backend status.
+- Debug mode (closes #15) — append `?debug=1` to the kiosk URL for an on-screen
+  overlay with real-time poll data and timestamps.
+- Dev health: `CONTRIBUTING.md`, issue templates (bug report + feature request),
+  and pull request template (closes #37).
+
 ## 2.1.6 - 2026-05-10
 
 ### Added
