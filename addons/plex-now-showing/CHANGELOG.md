@@ -3,6 +3,20 @@
 All notable changes to the Now Showing add-on will be documented here.
 The project follows [Semantic Versioning](https://semver.org/).
 
+## 2.3.1 - 2026-05-19
+
+### Fixed
+- SSE endpoint crash (closes #104) — `ReferenceError: req is not defined` on every
+  `/api/events` connection. The parameter `_req` (intentionally unused prefix) was
+  referenced as `req` in the `close` handler, causing Express to return a 500 error
+  after writing the initial `:ok` heartbeat. Browser EventSource clients saw a
+  broken connection and fell back to polling, but the partial response could
+  render as raw `:ok` text depending on proxy timing.
+- `package.json` version bumped to `2.3.1` (was still `2.1.6` from the pre-v2.2.0
+  era). The add-on store (`config.yaml`) has been at `2.3.0` since v2.3.0, but the
+  server runtime reported `v2.1.6` everywhere — boot logs, `/api`, `/healthz`, and
+  the HTTP header.
+
 ## 2.3.0 - 2026-05-18
 
 ### Added

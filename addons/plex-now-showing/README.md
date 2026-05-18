@@ -4,6 +4,56 @@ Cinema-style now-playing and coming-soon kiosk for Home Assistant, installed
 straight from the Home Assistant add-on store. One click, no long-lived access
 token, no Docker command line.
 
+## What's new in 2.3.1
+
+- **Fixed SSE crash** — a `ReferenceError: req is not defined` in the `/api/events`
+  endpoint was causing the SSE connection to break after sending the initial `:ok`
+  heartbeat. The browser's EventSource fell back to polling, but intermittent HTTP
+  proxy timing could leave `:ok` as visible text on the kiosk. Fixed.
+- **Server version now matches add-on store** — the server runtime was reporting
+  `v2.1.6` despite the add-on being on `v2.3.0`. Boot logs, `/api`, and `/healthz`
+  now correctly report `v2.3.1`.
+
+## What's new in 2.3.0
+
+- **Poster framing modes** — three layout options (`centred`, `cover`, `matted`) for
+  how artwork sits in the kiosk view. Configurable via `visual_poster_framing`.
+- **Film-grain overlay** — subtle 5% opacity SVG noise texture for cinematic
+  warmth. Toggle on with `visual_film_grain`.
+- **Ken Burns poster pan** — a slow 30 s zoom/translate animation on the poster
+  art. Toggle on with `visual_ken_burns`.
+- **Self-hosted Google Fonts** — Bebas Neue, Playfair Display, Inter, Anton,
+  Monoton, and Oswald shipped as bundled woff2 files. No CDN needed — survives
+  internet outages with zero external dependencies.
+- **Per-section info panel toggles** — independent visibility switches for
+  title, subtitle, meta (year/runtime/rating), summary, tech box, and player
+  info. All default ON so existing installs see no change. Set via
+  `visual_info_show_*` env vars or the in-app setup overlay.
+- **Live updates via HA WebSocket + SSE** — the server now connects to Home
+  Assistant's WebSocket API for real-time state changes and pushes them to
+  browsers via Server-Sent Events at `/api/events`. The browser falls back to
+  30 s polling only when SSE isn't available (no more 5 s polling).
+- **Fixed overlay persistence bug** — `posterFraming`, `filmGrain`, and
+  `kenBurns` were never registered in the overlay store, so the in-app setup
+  UI silently dropped saves for these fields. All visual settings now persist
+  correctly across devices.
+- **Graceful shutdown** — the HA WebSocket client is properly cleaned up on
+  SIGTERM/SIGINT, leaving no stale connections.
+
+## What's new in 2.2.0
+
+- **CSS-driven chase animation** — replaces the old JS `setInterval` with a
+  native `@keyframes` animation. Smoother on low-end tablets, no GC churn,
+  survives tab backgrounding without stuttering.
+- **Connection status indicators** — two small dots in the bottom-right corner
+  show HA server health (green/amber/red/grey) and media backend status, so
+  you can tell at a glance if everything is connected.
+- **Debug mode** — append `?debug=1` to the kiosk URL for an on-screen overlay
+  with real-time poll data and timestamps. Handy for diagnosing connection
+  issues without digging through logs.
+- **Developer health** — new `CONTRIBUTING.md`, bug report and feature request
+  issue templates, and a PR template to make community contributions easier.
+
 ## What's new in 2.1.6
 
 - New **Include cinema / theatrical releases** checkbox in the in-app

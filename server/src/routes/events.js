@@ -27,7 +27,7 @@ export function createEventBroadcaster() {
       try { res.write(`:ping\n\n`); } catch { clearInterval(keepAlive); }
     }, 30000);
 
-    req.on('close', () => {
+    _req.on('close', () => {
       clearInterval(keepAlive);
       clients.delete(res);
     });
