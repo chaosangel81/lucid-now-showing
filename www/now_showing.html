@@ -5847,6 +5847,17 @@
       sseSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Config change event — update DISPLAY_MODE and trigger re-poll
+          if (data && data.type === 'config_changed' && data.config) {
+            const newMode = data.config.displayMode || 'now_showing';
+            if (newMode !== DISPLAY_MODE) {
+              DISPLAY_MODE = readDisplayMode(newMode);
+              syncDisplayModeText();
+              poll();
+              debugLogMsg(`[SSE] Config changed — displayMode: ${DISPLAY_MODE}`);
+            }
+            return;
+          }
           // Server sends null payload when nothing is playing
           if (data && data.state) {
             showMedia(data);

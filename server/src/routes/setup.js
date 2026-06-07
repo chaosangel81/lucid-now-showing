@@ -530,7 +530,7 @@ function mutateInPlace(target, next) {
   for (const k of Object.keys(next.visual || {})) target.visual[k] = next.visual[k];
 }
 
-export function setupRoute({ baseConfig, liveConfig, store }) {
+export function setupRoute({ baseConfig, liveConfig, store, eventBus }) {
   const r = Router();
 
   r.get('/api/setup', (_req, res) => {
@@ -549,6 +549,8 @@ export function setupRoute({ baseConfig, liveConfig, store }) {
       store.write(merged);
       const effective = applyOverlay(baseConfig, merged);
       mutateInPlace(liveConfig, effective);
+      // Broadcast config change so kiosk clients pick up displayMode changes
+      if (eventBus) eventBus.broadcast({ type: 'config_changed', config: effectiveSetupView(liveConfig) });
       return res.json(effectiveSetupView(liveConfig));
     } catch (err) {
       console.error('[setup] save failed:', err.message);
@@ -561,6 +563,8 @@ export function setupRoute({ baseConfig, liveConfig, store }) {
       store.clear();
       const effective = applyOverlay(baseConfig, {});
       mutateInPlace(liveConfig, effective);
+      // Broadcast config change so kiosk clients pick up displayMode changes
+      if (eventBus) eventBus.broadcast({ type: 'config_changed', config: effectiveSetupView(liveConfig) });
       return res.json(effectiveSetupView(liveConfig));
     } catch (err) {
       console.error('[setup] reset failed:', err.message);
