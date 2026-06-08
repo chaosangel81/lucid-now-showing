@@ -1,0 +1,30 @@
+# Build from repo root — adjusted paths for the addon container image.
+# Key change from upstream: no USER app — HA supervisor mounts /data as root,
+# and pre-built images need to run as root to write to that mount.
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY server/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+RUN apk add --no-cache dumb-init
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY server/package.json ./
+COPY server/src ./src
+COPY www ./www
+
+ENV NODE_ENV=production \
+    PORT=8099 \
+    STATIC_DIR=/app/www
+
+EXPOSE 8099
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8099/healthz >/dev/null || exit 1
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "src/server.js"]

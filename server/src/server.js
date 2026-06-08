@@ -28,7 +28,7 @@ import { artworkRoute } from './routes/artwork.js';
 import { plexArtRoute } from './routes/plexArt.js';
 import { nightModeRoute } from './routes/nightMode.js';
 import { comingSoonRoute } from './routes/comingSoon.js';
-import { setupRoute } from './routes/setup.js';
+import { setupRoute, effectiveSetupView } from './routes/setup.js';
 import { createOverlayStore, applyOverlay } from './overlayStore.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -102,7 +102,8 @@ export function createApp({ config, haClient, overlayStore, baseConfig }) {
   app.use(rootRoute({ config, version: pkg.version }));
   app.use(healthzRoute({ config, version: pkg.version }));
   app.use(configRoute({ config }));
-  app.use(setupRoute({ baseConfig: baseline, liveConfig: config, store }));
+
+  app.use(setupRoute({ baseConfig: baseline, liveConfig: config, store, eventBus }));
   app.use(stateRoute({ haClient, cache: stateCache, config }));
   app.use(mediaInfoRoute({ cache: mediaInfoCache, config }));
   app.use(artworkRoute({ config }));
@@ -158,10 +159,17 @@ if (isDirectRun) {
   // instead of forcing them to poll.
   if (config.haUrl && config.haToken) {
     const eventBus = app.get('eventBus');
+    let pendingSwitch = null;
     haWs = createHaWsClient({
       haUrl: config.haUrl,
       haToken: config.haToken,
       onStateChange: (data) => {
+        // Only process state changes for the pinned player (or configured backend)
+        // Ignore events from other media_player entities to prevent false triggers
+        const entityId = (data && data.entity_id) || '';
+        const pinnedPlayer = config.player || '';
+        if (pinnedPlayer && entityId !== pinnedPlayer) return;
+
         stateCache.invalidate('state');
         const normalised = normalise([data.new_state], {
           backend: config.backend,
@@ -169,6 +177,27 @@ if (isDirectRun) {
           plexPlayer: config.plexPlayer,
           plexUsername: config.plexUsername,
         });
+
+        // Auto-switch displayMode based on queue (title) state:
+        // idle (null) + now_showing -> coming_soon
+        // playing (non-null) + coming_soon -> now_showing
+        const isIdle = normalised === null;
+        const curMode = config.displayMode || 'now_showing';
+        const newMode = isIdle ? 'coming_soon' : 'now_showing';
+        if (curMode !== newMode) {
+          if (pendingSwitch !== newMode) {
+            pendingSwitch = newMode;
+            eventBus.broadcast(normalised || null);
+            return;
+          }
+          pendingSwitch = null;
+          console.log('[auto-switch] displayMode: ' + curMode + ' -> ' + newMode);
+          config.displayMode = newMode;
+          eventBus.broadcast({ type: 'config_changed', config: effectiveSetupView(config) });
+          return;
+        }
+        pendingSwitch = null;
+
         eventBus.broadcast(normalised || null);
       },
       onError: (err) => console.error(`[ha-ws] ${err.message}`),

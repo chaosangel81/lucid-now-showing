@@ -5670,13 +5670,9 @@
 
     // ===== UPDATE DISPLAY =====
     function showMedia(data) {
-      // `/api/artwork` paths are add-on proxy routes — must use the
-      // page origin, not HA_URL (which points to Home Assistant).
       const artworkUrl = data.artwork.startsWith('http')
         ? data.artwork
-        : data.artwork.startsWith('/api/artwork')
-          ? window.location.origin + data.artwork
-          : `${HA_URL}${data.artwork}`;
+        : `${HA_URL}${data.artwork}`;
 
       const mediaKey = `${data.title}_${data.seriesTitle}_${artworkUrl}`;
       const isSameMedia = mediaKey === currentMediaKey && isShowingMedia;
@@ -5847,6 +5843,17 @@
       sseSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Config change event — update DISPLAY_MODE and trigger re-poll
+          if (data && data.type === 'config_changed' && data.config) {
+            const newMode = data.config.displayMode || 'now_showing';
+            if (newMode !== DISPLAY_MODE) {
+              DISPLAY_MODE = readDisplayMode(newMode);
+              syncDisplayModeText();
+              poll();
+              debugLogMsg(`[SSE] Config changed — displayMode: ${DISPLAY_MODE}`);
+            }
+            return;
+          }
           // Server sends null payload when nothing is playing
           if (data && data.state) {
             showMedia(data);

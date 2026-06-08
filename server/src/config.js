@@ -264,7 +264,7 @@ export function validate(c) {
   if (c.displayMode === 'coming_soon') {
     const hasSource = !!((c.comingSoon.radarrUrl && c.comingSoon.radarrApiKey)
       || (c.comingSoon.sonarrUrl && c.comingSoon.sonarrApiKey));
-    if (!hasSource) errors.push('at least one Coming Soon source is required when DISPLAY_MODE=coming_soon');
+    if (!hasSource) console.warn('[config] Coming Soon mode set but no sources configured; auto-switch will handle this');
   }
   if (c.switcherEnabled && !c.fullyKiosksRaw) {
     errors.push('FULLY_KIOSKS is required when SWITCHER_ENABLED is true');
