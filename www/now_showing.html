@@ -1074,7 +1074,7 @@
     }
     .poster-area-next {
       z-index: 1;
-      transition: none !important;
+
     }
     .poster-area.loaded {
       opacity: 1;
@@ -5736,8 +5736,11 @@
         setTimeout(() => {
           posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
           posterArea.classList.add('loaded');
+          posterAreaNext.style.transition = 'none';
           posterAreaNext.classList.remove('loaded');
           posterAreaNext.style.backgroundImage = '';
+          // Re-enable transition for next cycle
+          setTimeout(() => { posterAreaNext.style.transition = ''; }, 50);
         }, 900);
       };
       posterAreaNext.classList.remove('loaded');
