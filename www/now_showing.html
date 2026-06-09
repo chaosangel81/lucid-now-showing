@@ -901,6 +901,13 @@
       50%  { transform: scale(1.08) translate(-2%, -1%); }
       100% { transform: scale(1.0) translate(0, 0); }
     }
+    .poster-area {
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+    .poster-area-next {
+      z-index: 1;
+    }
     body.visual-ken-burns .poster-area.loaded {
       animation: ken-burns 30s ease-in-out infinite;
       will-change: transform;
@@ -1061,6 +1068,14 @@
       opacity: 1;
     }
 
+    .poster-area {
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+    .poster-area-next {
+      z-index: 1;
+
+    }
     .poster-area.loaded {
       opacity: 1;
     }
@@ -2678,6 +2693,7 @@
       <div class="poster-bg-blur" id="posterBgBlur"></div>
       <!-- Poster foreground -->
       <div class="poster-area" id="posterArea"></div>
+      <div class="poster-area poster-area-next" id="posterAreaNext"></div>
 
       <!-- Overlays on top of poster -->
       <div class="poster-overlay" id="posterOverlay" style="display:none;"></div>
@@ -4544,6 +4560,7 @@
 
     // ===== DOM REFS =====
     const posterArea = document.getElementById('posterArea');
+    const posterAreaNext = document.getElementById("posterAreaNext");
     const posterBgBlur = document.getElementById('posterBgBlur');
     const posterOverlay = document.getElementById('posterOverlay');
     const posterTitle = document.getElementById('posterTitle');
@@ -5022,6 +5039,7 @@
 
     // ===== CONNECTION STATUS INDICATORS (#15) =====
     let statusTimer = null;
+    let comingSoonCycleTimer = null;
 
     function setStatusDot(id, state) {
       const el = document.getElementById(id);
@@ -5706,16 +5724,27 @@
       isShowingMedia = true;
       hideInfo();
 
-      // Update poster background image
+      // Update poster with crossfade: load into next layer, fade in, then swap
       const img = new Image();
       img.onload = () => {
-        posterArea.style.backgroundImage = `url(${artworkUrl})`;
-        posterArea.classList.add('loaded');
+        posterAreaNext.style.backgroundImage = `url(${artworkUrl})`;
+        posterAreaNext.classList.add('loaded');
         // Also update blurred background for landscape mode
         posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
         posterBgBlur.classList.add('loaded');
+        // After crossfade completes, swap layers
+        setTimeout(() => {
+          posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
+          posterArea.classList.add('loaded');
+          posterAreaNext.style.transition = 'none';
+          posterAreaNext.classList.remove('loaded');
+          posterAreaNext.style.backgroundImage = '';
+          // Re-enable transition for next cycle
+          setTimeout(() => { posterAreaNext.style.transition = ''; }, 50);
+        }, 900);
       };
-      posterArea.classList.remove('loaded');
+      posterAreaNext.classList.remove('loaded');
+      posterAreaNext.style.backgroundImage = '';
       posterBgBlur.classList.remove('loaded');
       img.src = artworkUrl;
 
@@ -5849,7 +5878,7 @@
             if (newMode !== DISPLAY_MODE) {
               DISPLAY_MODE = readDisplayMode(newMode);
               syncDisplayModeText();
-              poll();
+              if (DISPLAY_MODE === "coming_soon") { startComingSoonCycle(); } else { stopComingSoonCycle(); poll(); }
               debugLogMsg(`[SSE] Config changed — displayMode: ${DISPLAY_MODE}`);
             }
             return;
@@ -5888,6 +5917,25 @@
 
     // ===== POLLING LOOP =====
     // Primary: SSE push from server. Fallback: 30s poll.
+    // ===== COMING SOON CYCLE TIMER =====
+    // Re-polls the coming-soon endpoint every cycleInterval seconds so the
+    // kiosk poster rotates without a full page refresh.  Uses the existing
+    // showMedia() fade-in transition for smooth crossfades.
+    function startComingSoonCycle() {
+      stopComingSoonCycle();
+      const ms = Math.max(2, Number(COMING_SOON.cycleInterval) || 8) * 1000;
+      comingSoonCycleTimer = setInterval(() => poll(), ms);
+      debugLogMsg("[coming-soon] cycle started — every " + (ms / 1000) + "s");
+    }
+
+    function stopComingSoonCycle() {
+      if (comingSoonCycleTimer) {
+        clearInterval(comingSoonCycleTimer);
+        comingSoonCycleTimer = null;
+        debugLogMsg("[coming-soon] cycle stopped");
+      }
+    }
+
     async function poll() {
       const data = await fetchNowShowingData();
       if (data) {
@@ -5910,6 +5958,7 @@
       startSseConnection();
       // Do an immediate poll so the first render is instant (before SSE delivers)
       poll();
+      if (DISPLAY_MODE === "coming_soon") startComingSoonCycle();
       startConnectionPolling();
       if (window.DEBUG_MODE) debugLogMsg('Debug mode enabled');
     }
@@ -5937,6 +5986,7 @@
     window.addEventListener('beforeunload', () => {
       if (sseSource) { sseSource.close(); sseSource = null; }
       if (sseFallbackTimer) { clearInterval(sseFallbackTimer); sseFallbackTimer = null; }
+      stopComingSoonCycle();
     });
   </script>
 </body>
