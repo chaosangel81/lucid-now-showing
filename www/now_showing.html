@@ -890,6 +890,10 @@
       50%  { transform: scale(1.08) translate(-2%, -1%); }
       100% { transform: scale(1.0) translate(0, 0); }
     }
+    .poster-kenburns-wrapper {
+      position: absolute;
+      inset: 0;
+    }
     .poster-area {
       opacity: 0;
       transition: opacity 0.8s ease;
@@ -897,7 +901,7 @@
     .poster-area-next {
       z-index: 1;
     }
-    body.visual-ken-burns .poster-area.loaded {
+    body.visual-ken-burns .poster-kenburns-wrapper {
       animation: ken-burns 30s ease-in-out infinite;
       will-change: transform;
     }
@@ -2681,8 +2685,10 @@
       <!-- Blurred background for landscape mode -->
       <div class="poster-bg-blur" id="posterBgBlur"></div>
       <!-- Poster foreground -->
-      <div class="poster-area" id="posterArea"></div>
-      <div class="poster-area poster-area-next" id="posterAreaNext"></div>
+      <div class="poster-kenburns-wrapper" id="posterKbWrapper">
+        <div class="poster-area" id="posterArea"></div>
+        <div class="poster-area poster-area-next" id="posterAreaNext"></div>
+      </div>
 
       <!-- Overlays on top of poster -->
       <div class="poster-overlay" id="posterOverlay" style="display:none;"></div>
@@ -4574,6 +4580,8 @@
     let isShowingMedia = false;
     let currentMediaData = null;
     let infoTimeout = null;
+    let isCrossfading = false;
+    let pendingMediaData = null;
     let cachedMediaInfo = {};  // Cache Plex media info by ratingKey
     const infoOverlay = document.getElementById('infoOverlay');
     const infoTitle = document.getElementById('infoTitle');
@@ -5719,6 +5727,13 @@
       hideInfo();
 
       // Update poster with crossfade: load into next layer, fade in, then swap
+      // If already crossfading, cache the new data and skip
+      if (isCrossfading) {
+        pendingMediaData = data;
+        return;
+      }
+      isCrossfading = true;
+
       const img = new Image();
       img.onload = () => {
         posterAreaNext.style.backgroundImage = `url(${artworkUrl})`;
@@ -5726,16 +5741,27 @@
         // Also update blurred background for landscape mode
         posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
         posterBgBlur.classList.add('loaded');
-        // After crossfade completes, swap layers
-        setTimeout(() => {
+        // Swap layers when the fade-in transition completes
+        const onTransitionEnd = () => {
+          posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
           posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
           posterArea.classList.add('loaded');
           posterAreaNext.style.transition = 'none';
           posterAreaNext.classList.remove('loaded');
           posterAreaNext.style.backgroundImage = '';
           // Re-enable transition for next cycle
-          setTimeout(() => { posterAreaNext.style.transition = ''; }, 50);
-        }, 900);
+          requestAnimationFrame(() => { posterAreaNext.style.transition = ''; });
+          isCrossfading = false;
+          // If a poll fired during crossfade, show the pending image now
+          if (pendingMediaData) {
+            const pending = pendingMediaData;
+            pendingMediaData = null;
+            showMedia(pending);
+          }
+        };
+        posterAreaNext.addEventListener('transitionend', onTransitionEnd);
+        // Safety timeout in case transitionend doesn't fire (element hidden, etc)
+        setTimeout(onTransitionEnd, 2000);
       };
       posterAreaNext.classList.remove('loaded');
       posterAreaNext.style.backgroundImage = '';
