@@ -4582,7 +4582,6 @@
     let infoTimeout = null;
     let isCrossfading = false;
     let pendingMediaData = null;
-    let nextLayerIsA = false;
     const pageLoadTime = Date.now();
     let cachedMediaInfo = {};  // Cache Plex media info by ratingKey
     const infoOverlay = document.getElementById('infoOverlay');
@@ -5728,54 +5727,33 @@
       isShowingMedia = true;
       hideInfo();
 
-      // Crossfade via alternating layers — no swap needed.
-      // Each new image loads into the inactive layer and fades in on top.
-      // The old layer stays visible underneath (no clearing until next cycle).
+      // Simple fade: preload image, then swap background with CSS transition.
+      // The .loaded class drives opacity:0→0.8s→1 via CSS transition.
       if (isCrossfading) {
         pendingMediaData = data;
         return;
       }
       isCrossfading = true;
 
-      // Pick which layer to use: alternate each time
-      const targetLayer = nextLayerIsA ? posterArea : posterAreaNext;
-      const otherLayer = nextLayerIsA ? posterAreaNext : posterArea;
-      nextLayerIsA = !nextLayerIsA;
-
       const img = new Image();
       img.onload = () => {
-        // Bring target layer to front
-        targetLayer.style.zIndex = '2';
-        targetLayer.style.backgroundImage = `url(${artworkUrl})`;
-        targetLayer.classList.add('loaded');
-        // Update blur backdrop
-        posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
-        posterBgBlur.classList.add('loaded');
-        // After fade-in completes, clear the OLD layer (now behind)
-        const onDone = () => {
-          targetLayer.removeEventListener('transitionend', onDone);
-          clearTimeout(safetyTimer);
-          otherLayer.style.transition = 'none';
-          otherLayer.classList.remove('loaded');
-          otherLayer.style.backgroundImage = '';
-          otherLayer.style.zIndex = '';
-          requestAnimationFrame(() => { otherLayer.style.transition = ''; });
+        // Fade OUT current image
+        posterArea.classList.remove('loaded');
+        // After fade-out, swap image and fade IN
+        setTimeout(() => {
+          posterArea.style.backgroundImage = `url(${artworkUrl})`;
+          posterArea.classList.add('loaded');
+          posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
+          posterBgBlur.classList.add('loaded');
           isCrossfading = false;
           if (pendingMediaData) {
             const pending = pendingMediaData;
             pendingMediaData = null;
             showMedia(pending);
           }
-        };
-        targetLayer.addEventListener('transitionend', onDone);
-        const safetyTimer = setTimeout(onDone, 2000);
+        }, 800);
       };
-      // Prepare target layer (invisible, behind)
-      targetLayer.style.transition = 'none';
-      targetLayer.classList.remove('loaded');
-      targetLayer.style.backgroundImage = '';
-      targetLayer.style.zIndex = '0';
-      requestAnimationFrame(() => { targetLayer.style.transition = ''; });
+      img.src = artworkUrl;
 
       // Show overlay and title
       posterOverlay.style.display = 'block';
