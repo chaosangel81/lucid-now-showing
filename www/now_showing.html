@@ -5745,13 +5745,20 @@
         const onTransitionEnd = () => {
           posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
           clearTimeout(safetyTimer);
+          // Snap base layer instantly to the new image (disable transition
+          // so it doesn't fade from 0→1 on the first swap)
+          posterArea.style.transition = 'none';
           posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
           posterArea.classList.add('loaded');
+          // Clear next layer instantly
           posterAreaNext.style.transition = 'none';
           posterAreaNext.classList.remove('loaded');
           posterAreaNext.style.backgroundImage = '';
-          // Re-enable transition for next cycle
-          requestAnimationFrame(() => { posterAreaNext.style.transition = ''; });
+          // Re-enable transitions for next cycle
+          requestAnimationFrame(() => {
+            posterArea.style.transition = '';
+            posterAreaNext.style.transition = '';
+          });
           isCrossfading = false;
           // If a poll fired during crossfade, show the pending image now
           if (pendingMediaData) {
