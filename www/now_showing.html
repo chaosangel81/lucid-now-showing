@@ -899,7 +899,7 @@
       transition: opacity 0.8s ease;
     }
     .poster-area-next {
-      z-index: 1;
+      /* z-index managed by JS for alternating crossfade */
     }
     body.visual-ken-burns .poster-kenburns-wrapper {
       animation: ken-burns 30s ease-in-out infinite;
@@ -4582,6 +4582,7 @@
     let infoTimeout = null;
     let isCrossfading = false;
     let pendingMediaData = null;
+    let nextLayerIsA = false;
     let cachedMediaInfo = {};  // Cache Plex media info by ratingKey
     const infoOverlay = document.getElementById('infoOverlay');
     const infoTitle = document.getElementById('infoTitle');
@@ -5726,63 +5727,54 @@
       isShowingMedia = true;
       hideInfo();
 
-      // Update poster with crossfade. On first image (no current poster),
-      // skip crossfade and set posterArea directly to avoid black flash.
-      const isFirstShow = !posterArea.classList.contains('loaded');
-
-      // If already crossfading, cache the new data and skip
-      if (!isFirstShow && isCrossfading) {
+      // Crossfade via alternating layers — no swap needed.
+      // Each new image loads into the inactive layer and fades in on top.
+      // The old layer stays visible underneath (no clearing until next cycle).
+      if (isCrossfading) {
         pendingMediaData = data;
         return;
       }
+      isCrossfading = true;
 
-      if (isFirstShow) {
-        // First image: load directly into posterArea, no crossfade needed
-        const img = new Image();
-        img.onload = () => {
-          posterArea.style.backgroundImage = `url(${artworkUrl})`;
-          posterArea.classList.add('loaded');
-          posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
-          posterBgBlur.classList.add('loaded');
+      // Pick which layer to use: alternate each time
+      const targetLayer = nextLayerIsA ? posterArea : posterAreaNext;
+      const otherLayer = nextLayerIsA ? posterAreaNext : posterArea;
+      nextLayerIsA = !nextLayerIsA;
+
+      const img = new Image();
+      img.onload = () => {
+        // Bring target layer to front
+        targetLayer.style.zIndex = '2';
+        targetLayer.style.backgroundImage = `url(${artworkUrl})`;
+        targetLayer.classList.add('loaded');
+        // Update blur backdrop
+        posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
+        posterBgBlur.classList.add('loaded');
+        // After fade-in completes, clear the OLD layer (now behind)
+        const onDone = () => {
+          targetLayer.removeEventListener('transitionend', onDone);
+          clearTimeout(safetyTimer);
+          otherLayer.style.transition = 'none';
+          otherLayer.classList.remove('loaded');
+          otherLayer.style.backgroundImage = '';
+          otherLayer.style.zIndex = '';
+          requestAnimationFrame(() => { otherLayer.style.transition = ''; });
+          isCrossfading = false;
+          if (pendingMediaData) {
+            const pending = pendingMediaData;
+            pendingMediaData = null;
+            showMedia(pending);
+          }
         };
-        img.src = artworkUrl;
-      } else {
-        // Subsequent images: crossfade via next layer
-        isCrossfading = true;
-        const img = new Image();
-        img.onload = () => {
-          posterAreaNext.style.backgroundImage = `url(${artworkUrl})`;
-          posterAreaNext.classList.add('loaded');
-          posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
-          posterBgBlur.classList.add('loaded');
-          const onTransitionEnd = () => {
-            posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
-            clearTimeout(safetyTimer);
-            posterArea.style.transition = 'none';
-            posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
-            posterArea.classList.add('loaded');
-            posterAreaNext.style.transition = 'none';
-            posterAreaNext.classList.remove('loaded');
-            posterAreaNext.style.backgroundImage = '';
-            requestAnimationFrame(() => {
-              posterArea.style.transition = '';
-              posterAreaNext.style.transition = '';
-            });
-            isCrossfading = false;
-            if (pendingMediaData) {
-              const pending = pendingMediaData;
-              pendingMediaData = null;
-              showMedia(pending);
-            }
-          };
-          posterAreaNext.addEventListener('transitionend', onTransitionEnd);
-          const safetyTimer = setTimeout(onTransitionEnd, 2000);
-        };
-        posterAreaNext.classList.remove('loaded');
-        posterAreaNext.style.backgroundImage = '';
-        posterBgBlur.classList.remove('loaded');
-        img.src = artworkUrl;
-      }
+        targetLayer.addEventListener('transitionend', onDone);
+        const safetyTimer = setTimeout(onDone, 2000);
+      };
+      // Prepare target layer (invisible, behind)
+      targetLayer.style.transition = 'none';
+      targetLayer.classList.remove('loaded');
+      targetLayer.style.backgroundImage = '';
+      targetLayer.style.zIndex = '0';
+      requestAnimationFrame(() => { targetLayer.style.transition = ''; });
 
       // Show overlay and title
       posterOverlay.style.display = 'block';
