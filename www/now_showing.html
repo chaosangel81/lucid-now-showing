@@ -5726,55 +5726,63 @@
       isShowingMedia = true;
       hideInfo();
 
-      // Update poster with crossfade: load into next layer, fade in, then swap
+      // Update poster with crossfade. On first image (no current poster),
+      // skip crossfade and set posterArea directly to avoid black flash.
+      const isFirstShow = !posterArea.classList.contains('loaded');
+
       // If already crossfading, cache the new data and skip
-      if (isCrossfading) {
+      if (!isFirstShow && isCrossfading) {
         pendingMediaData = data;
         return;
       }
-      isCrossfading = true;
 
-      const img = new Image();
-      img.onload = () => {
-        posterAreaNext.style.backgroundImage = `url(${artworkUrl})`;
-        posterAreaNext.classList.add('loaded');
-        // Also update blurred background for landscape mode
-        posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
-        posterBgBlur.classList.add('loaded');
-        // Swap layers when the fade-in transition completes
-        const onTransitionEnd = () => {
-          posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
-          clearTimeout(safetyTimer);
-          // Snap base layer instantly to the new image (disable transition
-          // so it doesn't fade from 0→1 on the first swap)
-          posterArea.style.transition = 'none';
-          posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
+      if (isFirstShow) {
+        // First image: load directly into posterArea, no crossfade needed
+        const img = new Image();
+        img.onload = () => {
+          posterArea.style.backgroundImage = `url(${artworkUrl})`;
           posterArea.classList.add('loaded');
-          // Clear next layer instantly
-          posterAreaNext.style.transition = 'none';
-          posterAreaNext.classList.remove('loaded');
-          posterAreaNext.style.backgroundImage = '';
-          // Re-enable transitions for next cycle
-          requestAnimationFrame(() => {
-            posterArea.style.transition = '';
-            posterAreaNext.style.transition = '';
-          });
-          isCrossfading = false;
-          // If a poll fired during crossfade, show the pending image now
-          if (pendingMediaData) {
-            const pending = pendingMediaData;
-            pendingMediaData = null;
-            showMedia(pending);
-          }
+          posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
+          posterBgBlur.classList.add('loaded');
         };
-        posterAreaNext.addEventListener('transitionend', onTransitionEnd);
-        // Safety timeout in case transitionend doesn't fire (element hidden, etc)
-        const safetyTimer = setTimeout(onTransitionEnd, 2000);
-      };
-      posterAreaNext.classList.remove('loaded');
-      posterAreaNext.style.backgroundImage = '';
-      posterBgBlur.classList.remove('loaded');
-      img.src = artworkUrl;
+        img.src = artworkUrl;
+      } else {
+        // Subsequent images: crossfade via next layer
+        isCrossfading = true;
+        const img = new Image();
+        img.onload = () => {
+          posterAreaNext.style.backgroundImage = `url(${artworkUrl})`;
+          posterAreaNext.classList.add('loaded');
+          posterBgBlur.style.backgroundImage = `url(${artworkUrl})`;
+          posterBgBlur.classList.add('loaded');
+          const onTransitionEnd = () => {
+            posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
+            clearTimeout(safetyTimer);
+            posterArea.style.transition = 'none';
+            posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
+            posterArea.classList.add('loaded');
+            posterAreaNext.style.transition = 'none';
+            posterAreaNext.classList.remove('loaded');
+            posterAreaNext.style.backgroundImage = '';
+            requestAnimationFrame(() => {
+              posterArea.style.transition = '';
+              posterAreaNext.style.transition = '';
+            });
+            isCrossfading = false;
+            if (pendingMediaData) {
+              const pending = pendingMediaData;
+              pendingMediaData = null;
+              showMedia(pending);
+            }
+          };
+          posterAreaNext.addEventListener('transitionend', onTransitionEnd);
+          const safetyTimer = setTimeout(onTransitionEnd, 2000);
+        };
+        posterAreaNext.classList.remove('loaded');
+        posterAreaNext.style.backgroundImage = '';
+        posterBgBlur.classList.remove('loaded');
+        img.src = artworkUrl;
+      }
 
       // Show overlay and title
       posterOverlay.style.display = 'block';
