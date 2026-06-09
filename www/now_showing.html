@@ -676,22 +676,6 @@
       width: var(--pns-bulb-size, 28px);
       height: var(--pns-bulb-size, 28px);
       border-radius: 50%;
-      /* Three-stop bulb gradient: hot core (--bulb-on lightened) → main
-       * bulb colour → dark rim (--accent-mid). Now reads from the accent
-       * ramp so non-gold themes get a coherent bulb tint instead of always
-       * fading to gold. */
-      /* Fallback for browsers without color-mix (Chromium <111) */
-    }
-    @supports not (color: color-mix(in srgb, red, blue)) {
-    .bulb {
-      background: radial-gradient(circle at 40% 35%,
-        var(--bulb-on),
-        var(--bulb-on) 40%,
-        var(--accent-mid) 100%);
-      box-shadow:
-        0 0 16px 6px var(--accent-glow),
-        0 0 32px 12px var(--accent-glow),
-        0 0 4px 2px var(--bulb-on);
       transition: all 0.35s ease;
     }
 
@@ -705,31 +689,13 @@
         0 0 16px 6px color-mix(in srgb, var(--accent-glow) 70%, transparent),
         0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
         0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent);
+    }
+    } /* end @supports color-mix for .bulb */
 
     .bulb.off {
       background: radial-gradient(circle at 40% 35%, #887744, var(--bulb-off) 60%);
       box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4);
     }
-
-    /* Fallback keyframes for browsers without color-mix */
-    @supports not (color: color-mix(in srgb, red, blue)) {
-    @keyframes bulb-chase {
-      0%, 30% { background: radial-gradient(circle at 40% 35%,
-          var(--bulb-on), var(--bulb-on) 40%, var(--accent-mid) 100%);
-        box-shadow:
-          0 0 16px 6px var(--accent-glow),
-          0 0 32px 12px var(--accent-glow),
-          0 0 4px 2px var(--bulb-on); }
-      33%, 95% { background: radial-gradient(circle at 40% 35%, #887744, var(--bulb-off) 60%);
-        box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4); }
-      100% { background: radial-gradient(circle at 40% 35%,
-          var(--bulb-on), var(--bulb-on) 40%, var(--accent-mid) 100%);
-        box-shadow:
-          0 0 16px 6px var(--accent-glow),
-          0 0 32px 12px var(--accent-glow),
-          0 0 4px 2px var(--bulb-on); }
-    }
-    } /* end @supports not */
 
     @supports (color: color-mix(in srgb, red, blue)) {
     @keyframes bulb-chase {
@@ -752,12 +718,11 @@
           0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
           0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent); }
     }
-    } /* end @supports color-mix */
+    } /* end @supports color-mix for keyframes */
 
     .bulb.chase-anim {
       animation: bulb-chase 1.5s ease-in-out infinite;
     }
-
     /* ===== CONNECTION STATUS INDICATOR (#15) ===== */
     .status-dots {
       position: fixed;
