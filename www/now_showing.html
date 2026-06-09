@@ -681,6 +681,9 @@
        * ramp so non-gold themes get a coherent bulb tint instead of always
        * fading to gold. */
       /* Fallback for browsers without color-mix (Chromium <111) */
+    }
+    @supports not (color: color-mix(in srgb, red, blue)) {
+    .bulb {
       background: radial-gradient(circle at 40% 35%,
         var(--bulb-on),
         var(--bulb-on) 40%,
@@ -709,6 +712,7 @@
     }
 
     /* Fallback keyframes for browsers without color-mix */
+    @supports not (color: color-mix(in srgb, red, blue)) {
     @keyframes bulb-chase {
       0%, 30% { background: radial-gradient(circle at 40% 35%,
           var(--bulb-on), var(--bulb-on) 40%, var(--accent-mid) 100%);
@@ -725,6 +729,7 @@
           0 0 32px 12px var(--accent-glow),
           0 0 4px 2px var(--bulb-on); }
     }
+    } /* end @supports not */
 
     @supports (color: color-mix(in srgb, red, blue)) {
     @keyframes bulb-chase {
