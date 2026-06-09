@@ -5744,6 +5744,7 @@
         // Swap layers when the fade-in transition completes
         const onTransitionEnd = () => {
           posterAreaNext.removeEventListener('transitionend', onTransitionEnd);
+          clearTimeout(safetyTimer);
           posterArea.style.backgroundImage = posterAreaNext.style.backgroundImage;
           posterArea.classList.add('loaded');
           posterAreaNext.style.transition = 'none';
@@ -5761,7 +5762,7 @@
         };
         posterAreaNext.addEventListener('transitionend', onTransitionEnd);
         // Safety timeout in case transitionend doesn't fire (element hidden, etc)
-        setTimeout(onTransitionEnd, 2000);
+        const safetyTimer = setTimeout(onTransitionEnd, 2000);
       };
       posterAreaNext.classList.remove('loaded');
       posterAreaNext.style.backgroundImage = '';
