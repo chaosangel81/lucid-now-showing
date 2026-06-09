@@ -680,28 +680,53 @@
        * bulb colour → dark rim (--accent-mid). Now reads from the accent
        * ramp so non-gold themes get a coherent bulb tint instead of always
        * fading to gold. */
+      /* Fallback for browsers without color-mix (Chromium <111) */
+      background: radial-gradient(circle at 40% 35%,
+        var(--bulb-on),
+        var(--bulb-on) 40%,
+        var(--accent-mid) 100%);
+      box-shadow:
+        0 0 16px 6px var(--accent-glow),
+        0 0 32px 12px var(--accent-glow),
+        0 0 4px 2px var(--bulb-on);
+      transition: all 0.35s ease;
+    }
+
+    @supports (color: color-mix(in srgb, red, blue)) {
+    .bulb {
       background: radial-gradient(circle at 40% 35%,
         color-mix(in srgb, var(--bulb-on) 70%, #fff 30%),
         var(--bulb-on) 40%,
         var(--accent-mid) 100%);
-      /* All three glow layers read from --accent-glow so theme presets
-       * recolour the entire bulb halo, not just the bulb body. */
       box-shadow:
         0 0 16px 6px color-mix(in srgb, var(--accent-glow) 70%, transparent),
         0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
         0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent);
-      transition: all 0.35s ease;
-    }
 
     .bulb.off {
       background: radial-gradient(circle at 40% 35%, #887744, var(--bulb-off) 60%);
       box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4);
     }
 
-    /* CSS-driven bulb chase (#16) — replaces the old setInterval approach.
-     * Each bulb's delay is set by JS via style="animation-delay: …ms".
-     * The animation toggles the 'off' class in three phases (on → off → off)
-     * to keep the original 3-step chase look without JS timers. */
+    /* Fallback keyframes for browsers without color-mix */
+    @keyframes bulb-chase {
+      0%, 30% { background: radial-gradient(circle at 40% 35%,
+          var(--bulb-on), var(--bulb-on) 40%, var(--accent-mid) 100%);
+        box-shadow:
+          0 0 16px 6px var(--accent-glow),
+          0 0 32px 12px var(--accent-glow),
+          0 0 4px 2px var(--bulb-on); }
+      33%, 95% { background: radial-gradient(circle at 40% 35%, #887744, var(--bulb-off) 60%);
+        box-shadow: 0 0 4px 2px rgba(102, 85, 34, 0.4); }
+      100% { background: radial-gradient(circle at 40% 35%,
+          var(--bulb-on), var(--bulb-on) 40%, var(--accent-mid) 100%);
+        box-shadow:
+          0 0 16px 6px var(--accent-glow),
+          0 0 32px 12px var(--accent-glow),
+          0 0 4px 2px var(--bulb-on); }
+    }
+
+    @supports (color: color-mix(in srgb, red, blue)) {
     @keyframes bulb-chase {
       0%, 30% { background: radial-gradient(circle at 40% 35%,
           color-mix(in srgb, var(--bulb-on) 70%, #fff 30%),
@@ -722,6 +747,7 @@
           0 0 32px 12px color-mix(in srgb, var(--accent-glow) 30%, transparent),
           0 0 4px 2px color-mix(in srgb, var(--bulb-on) 90%, transparent); }
     }
+    } /* end @supports color-mix */
 
     .bulb.chase-anim {
       animation: bulb-chase 1.5s ease-in-out infinite;
