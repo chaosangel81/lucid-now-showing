@@ -5006,7 +5006,12 @@
       }
 
       bulbsOuterContainer.innerHTML = '';
-      bulbs.forEach((b, idx) => {
+      // Cap bulb count to prevent GPU overload on large displays (Pi kiosks)
+      const MAX_BULBS = 80;
+      const step = Math.max(1, Math.ceil(bulbs.length / MAX_BULBS));
+      const capped = bulbs.filter((_, i) => i % step === 0);
+
+      capped.forEach((b, idx) => {
         const el = document.createElement('div');
         el.className = 'bulb chase-anim';
         el.style.left = b.x + 'px';
