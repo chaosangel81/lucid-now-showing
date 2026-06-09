@@ -4583,6 +4583,7 @@
     let isCrossfading = false;
     let pendingMediaData = null;
     let nextLayerIsA = false;
+    const pageLoadTime = Date.now();
     let cachedMediaInfo = {};  // Cache Plex media info by ratingKey
     const infoOverlay = document.getElementById('infoOverlay');
     const infoTitle = document.getElementById('infoTitle');
@@ -5903,7 +5904,9 @@
           // Config change event — reload page to pick up all visual settings
           // (filmGrain, kenBurns, theme, bulbs, etc.). Safe for kiosk — brief
           // refresh is invisible to viewers.
-          if (data && data.type === 'config_changed') {
+          // Ignore for the first 5s after page load to prevent auto-reload
+          // loop from server-side auto-switch firing config_changed on connect.
+          if (data && data.type === 'config_changed' && (Date.now() - pageLoadTime > 5000)) {
             debugLogMsg('[SSE] Config changed — reloading page');
             window.location.reload();
             return;
