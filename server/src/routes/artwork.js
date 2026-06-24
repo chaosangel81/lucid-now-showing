@@ -17,6 +17,17 @@ const cache = new Map(); // key = url, value = { buf: Buffer, contentType: strin
 export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
   const r = Router();
 
+  // CORS: allow HA dashboard (different origin/port) to load images
+  r.options('/api/artwork', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.end();
+  });
+  r.use('/api/artwork', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  });
+
   r.get('/api/artwork', async (req, res) => {
     const path = String(req.query.path || '');
 
