@@ -60,12 +60,13 @@ function isBackendPlayer(state, rule) {
 
 function shape(playerState) {
   const attrs = playerState.attributes || {};
-  // Rewrite HA-relative artwork paths to our own proxy so the browser can
-  // load them same-origin (without an HA token). Absolute URLs pass through.
+  // Route all artwork through our proxy so we can cache images for
   const rawArt = attrs.entity_picture || '';
-  const artwork = rawArt && !/^https?:\/\//i.test(rawArt)
+  const artwork = rawArt
     ? `/api/artwork?path=${encodeURIComponent(rawArt)}`
-    : rawArt;
+    : '';
+  // The proxy (routes/artwork.js) now caches fetched images so they
+  // persist when the upstream (e.g. Zidoo poster API) becomes unreachable.
   // Progress bar (#17) needs both current position and the timestamp HA last
   // updated it, so the browser can interpolate smoothly between polls when
   // playing. positionUpdatedAt is an ISO8601 string in HA state JSON.
