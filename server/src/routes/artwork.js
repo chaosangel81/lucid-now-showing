@@ -28,12 +28,17 @@ export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
     next();
   });
 
-  // Fetch from upstream and cache the result
+  // Fetch from upstream and cache the result. Only caches if response
+  // is actually an image (content-type starts with image/).
+  // Returns the buffer on success, throws on failure.
   async function fetchAndCache(key, url, opts) {
     const upstream = await fetchImpl(url, opts);
     if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
-    const ct = upstream.headers.get('content-type') || 'image/jpeg';
+    const ct = upstream.headers.get('content-type') || '';
     const buf = Buffer.from(await upstream.arrayBuffer());
+    if (!ct.startsWith('image/')) {
+      throw new Error(`upstream returned non-image content-type: ${ct}`);
+    }
     cache.set(key, { buf, contentType: ct });
     return buf;
   }
@@ -72,7 +77,15 @@ export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
       res.setHeader('X-Artwork-Cache', 'miss');
       res.end(buf);
     } catch (err) {
-      res.status(502).json({ error: 'artwork_unreachable', message: err.message });
+      // No cache and upstream failed — check if we have ANY cached image for this path
+      const cached = cache.get(path);
+      if (cached) {
+        res.setHeader('Content-Type', cached.contentType);
+        res.setHeader('X-Artwork-Cache', 'hit');
+        res.end(cached.buf);
+      } else {
+        res.status(502).json({ error: 'artwork_unreachable', message: err.message });
+      }
     }
   });
 
