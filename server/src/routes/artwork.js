@@ -28,6 +28,16 @@ export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
     next();
   });
 
+  // Fetch from upstream and cache the result
+  async function fetchAndCache(key, url, opts) {
+    const upstream = await fetchImpl(url, opts);
+    if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
+    const ct = upstream.headers.get('content-type') || 'image/jpeg';
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    cache.set(key, { buf, contentType: ct });
+    return buf;
+  }
+
   r.get('/api/artwork', async (req, res) => {
     const path = String(req.query.path || '');
 
@@ -39,29 +49,30 @@ export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
       ? {}
       : { headers: { Authorization: `Bearer ${config.haToken}` } };
 
+    // If we have a cached copy, serve it immediately and refresh in background.
+    // This prevents blank images when upstream is slow (e.g. Zidoo booting).
+    const cached = cache.get(path);
+
+    if (cached) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('X-Artwork-Cache', 'stale-while-revalidate');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.end(cached.buf);
+      // Refresh cache in background — don't block the response
+      fetchAndCache(path, upstreamUrl, fetchOpts).catch(() => {});
+      return;
+    }
+
+    // No cache — must wait for upstream
     try {
-      const upstream = await fetchImpl(upstreamUrl, fetchOpts);
-      if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
-
-      const ct = upstream.headers.get('content-type') || 'image/jpeg';
-      const buf = Buffer.from(await upstream.arrayBuffer());
-
-      // Cache for fallback when upstream dies later
-      cache.set(path, { buf, contentType: ct });
-
+      const buf = await fetchAndCache(path, upstreamUrl, fetchOpts);
+      const ct = cache.get(path).contentType;
       res.setHeader('Content-Type', ct);
       res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Artwork-Cache', 'miss');
       res.end(buf);
     } catch (err) {
-      // Upstream unreachable — serve from cache if available
-      const cached = cache.get(path);
-      if (cached) {
-        res.setHeader('Content-Type', cached.contentType);
-        res.setHeader('X-Artwork-Cache', 'hit');
-        res.end(cached.buf);
-      } else {
-        res.status(502).json({ error: 'artwork_unreachable', message: err.message });
-      }
+      res.status(502).json({ error: 'artwork_unreachable', message: err.message });
     }
   });
 
