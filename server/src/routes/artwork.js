@@ -34,9 +34,10 @@ export function artworkRoute({ config, fetchImpl = globalThis.fetch }) {
   async function fetchAndCache(key, url, opts) {
     const upstream = await fetchImpl(url, opts);
     if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
-    const ct = upstream.headers.get('content-type') || '';
+    const ct = upstream.headers.get('content-type') || 'image/jpeg';
     const buf = Buffer.from(await upstream.arrayBuffer());
-    if (!ct.startsWith('image/')) {
+    // Reject if upstream returned a non-image content-type (e.g. Zidoo JSON errors)
+    if (ct.startsWith('application/json') || ct.startsWith('text/')) {
       throw new Error(`upstream returned non-image content-type: ${ct}`);
     }
     cache.set(key, { buf, contentType: ct });
